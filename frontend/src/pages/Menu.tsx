@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { api, type Business, type Category, type Ingredient, type MenuItem } from "../api";
-import { CATEGORY_LABEL, amount, pct, rupiah, unitLabel } from "../format";
+import { api, type Business, type Category, type Ingredient, type MenuItem, type Settings } from "../api";
+import { amount, catLabel, pct, rupiah, unitLabel } from "../format";
+import { t, useLang } from "../i18n";
+
+const CATS: Category[] = ["makanan", "camilan", "minuman_dingin", "minuman_panas"];
+const suggest = (cost: number, margin: number) => (cost > 0 ? Math.ceil(cost / (1 - margin) / 500) * 500 : null);
 import { Dialog, ErrorBox, Loading, PageHead, Segmented, toast, useApi } from "../ui";
 
 export default function Menu({ business }: { business: Business }) {
+  useLang();
+  const settings = useApi<Settings>("/settings");
+  const margin = settings.data?.target_margin ?? 0.6;
   const [tab, setTab] = useState<"menu" | "bahan">("menu");
   const menu = useApi<MenuItem[]>("/menu?all=true");
   const ings = useApi<Ingredient[]>("/ingredients?all=true");
@@ -17,31 +24,35 @@ export default function Menu({ business }: { business: Business }) {
 
   return (
     <>
-      <PageHead title="Menu & resep" sub="Resep dipakai untuk menghitung modal per porsi, mengurangi stok, dan menyusun daftar belanja.">
-        <Segmented label="Bagian" value={tab} onChange={setTab} options={[{ value: "menu", label: "Menu" }, { value: "bahan", label: "Bahan" }]} />
+      <PageHead title={t("Menu & resep")} sub={t("Resep dipakai untuk menghitung modal per porsi, mengurangi stok, dan menyusun daftar belanja.")}>
+        <Segmented label={t("Bagian")} value={tab} onChange={setTab} options={[{ value: "menu", label: t("Menu") }, { value: "bahan", label: t("Bahan") }]} />
       </PageHead>
 
       {tab === "menu" ? (
         <div className="card">
           <div className="card-head">
-            <h2>{menu.data.filter((m) => m.active).length} menu aktif</h2>
+            <div><h2>{t("{n} menu aktif", { n: menu.data.filter((m) => m.active).length })}</h2>
+              <p className="small muted">{t("Saran harga memakai target untung {p} dari Pengaturan.", { p: pct(margin) })}</p></div>
             <div className="row">
-              <button className="btn small" onClick={() => setCatalog(true)}>Tambah dari contoh</button>
-              <button className="btn small primary" onClick={() => setEditItem("new")}>Menu baru</button>
+              <button className="btn small" onClick={() => setCatalog(true)}>{t("Tambah dari contoh")}</button>
+              <button className="btn small primary" onClick={() => setEditItem("new")}>{t("Menu baru")}</button>
             </div>
           </div>
           <div className="card-body table-wrap">
-            {menu.data.length === 0 ? <div className="empty">Belum ada menu. Mulai dari contoh menu warung atau kafe.</div> : (
+            {menu.data.length === 0 ? <div className="empty">{t("Belum ada menu. Mulai dari contoh menu warung atau kafe.")}</div> : (
               <table>
-                <thead><tr><th>Menu</th><th className="num">Harga</th><th className="num">Modal bahan</th><th className="num">Margin</th><th /></tr></thead>
+                <thead><tr><th>{t("Menu")}</th><th className="num">{t("Harga jual")}</th><th className="num">{t("Modal bahan")}</th><th className="num">{t("Untung per porsi")}</th><th className="num">{t("Saran harga")}</th><th /></tr></thead>
                 <tbody>{menu.data.map((m) => (
                   <tr key={m.id} style={{ opacity: m.active ? 1 : 0.55 }}>
-                    <td><strong>{m.name}</strong><div className="small muted">{CATEGORY_LABEL[m.category]}{!m.active && " · tidak dijual"}
-                      {m.recipe.length === 0 && <span className="badge warn" style={{ marginLeft: 6 }}>belum ada resep</span>}</div></td>
+                    <td><strong>{m.name}</strong><div className="small muted">{catLabel(m.category)}{!m.active && ` · ${t("tidak dijual")}`}
+                      {m.recipe.length === 0 && <span className="badge warn" style={{ marginLeft: 6 }}>{t("belum ada resep")}</span>}</div></td>
                     <td className="num">{rupiah(m.price)}</td>
                     <td className="num">{rupiah(m.unit_cost)}</td>
                     <td className="num"><span className={`badge ${m.margin !== null && m.margin < 0.4 ? "warn" : "good"}`}>{pct(m.margin)}</span></td>
-                    <td className="right"><button className="btn small" onClick={() => setEditItem(m)}>Ubah</button></td>
+                    <td className="num">{(() => { const sp = suggest(m.unit_cost, margin); return sp === null ? "–" : sp > m.price
+                      ? <span title={t("Harga sekarang di bawah target untung")}><strong>{rupiah(sp)}</strong> <span className="badge warn">{t("naikkan")}</span></span>
+                      : <span className="muted">{t("sudah pas")}</span>; })()}</td>
+                    <td className="right"><button className="btn small" onClick={() => setEditItem(m)}>{t("Ubah")}</button></td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -50,19 +61,19 @@ export default function Menu({ business }: { business: Business }) {
         </div>
       ) : (
         <div className="card">
-          <div className="card-head"><h2>{ings.data.length} bahan</h2>
-            <button className="btn small primary" onClick={() => setEditIng("new")}>Bahan baru</button></div>
+          <div className="card-head"><h2>{t("{n} bahan", { n: ings.data.length })}</h2>
+            <button className="btn small primary" onClick={() => setEditIng("new")}>{t("Bahan baru")}</button></div>
           <div className="card-body table-wrap">
             <table>
-              <thead><tr><th>Bahan</th><th className="num">Harga kemasan</th><th className="num">Tahan</th><th className="num">Datang</th><th className="num">Stok</th><th /></tr></thead>
+              <thead><tr><th>{t("Bahan")}</th><th className="num">{t("Harga kemasan")}</th><th className="num">{t("Tahan")}</th><th className="num">{t("Datang")}</th><th className="num">{t("Stok")}</th><th /></tr></thead>
               <tbody>{ings.data.map((g) => (
                 <tr key={g.id} style={{ opacity: g.active ? 1 : 0.55 }}>
                   <td><strong>{g.name}</strong><div className="small muted">{g.pack_name || amount(g.pack_size, g.unit)}</div></td>
                   <td className="num">{rupiah(g.cost_per_unit * g.pack_size)}</td>
-                  <td className="num">{g.shelf_life_days} hari</td>
-                  <td className="num">{g.lead_time_days === 0 ? "langsung" : `${g.lead_time_days} hari`}</td>
+                  <td className="num">{t("{n} hari", { n: g.shelf_life_days })}</td>
+                  <td className="num">{g.lead_time_days === 0 ? t("langsung") : t("{n} hari", { n: g.lead_time_days })}</td>
                   <td className="num">{amount(Math.max(0, g.on_hand), g.unit)}</td>
-                  <td className="right"><button className="btn small" onClick={() => setEditIng(g)}>Ubah</button></td>
+                  <td className="right"><button className="btn small" onClick={() => setEditIng(g)}>{t("Ubah")}</button></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -70,14 +81,14 @@ export default function Menu({ business }: { business: Business }) {
         </div>
       )}
 
-      {editItem && <ItemDialog item={editItem === "new" ? null : editItem} ings={ings.data} onClose={() => setEditItem(null)} onDone={reload} />}
+      {editItem && <ItemDialog item={editItem === "new" ? null : editItem} ings={ings.data} margin={margin} onClose={() => setEditItem(null)} onDone={reload} />}
       {editIng && <IngredientDialog ing={editIng === "new" ? null : editIng} onClose={() => setEditIng(null)} onDone={reload} />}
       {catalog && <CatalogDialog business={business} onClose={() => setCatalog(false)} onDone={reload} />}
     </>
   );
 }
 
-function ItemDialog({ item, ings, onClose, onDone }: { item: MenuItem | null; ings: Ingredient[]; onClose: () => void; onDone: () => void }) {
+function ItemDialog({ item, ings, margin, onClose, onDone }: { item: MenuItem | null; ings: Ingredient[]; margin: number; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState(item?.name ?? "");
   const [category, setCategory] = useState<Category>(item?.category ?? "makanan");
   const [price, setPrice] = useState(String(item?.price ?? ""));
@@ -94,46 +105,52 @@ function ItemDialog({ item, ings, onClose, onDone }: { item: MenuItem | null; in
         .map((r) => ({ ingredient_id: r.ingredient_id, amount: parseFloat(r.amount.replace(",", ".")) })) };
     try {
       if (item) await api.put(`/menu/${item.id}`, body); else await api.post("/menu", body);
-      toast("Menu disimpan");
+      toast(t("Menu disimpan"));
       onDone();
       onClose();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
 
   return (
-    <Dialog title={item ? `Ubah ${item.name}` : "Menu baru"} onClose={onClose} footer={<>
-      <button className="btn" onClick={onClose}>Batal</button>
-      <button className="btn primary" onClick={save} disabled={busy || !name || !price}>Simpan</button></>}>
-      <div className="field"><label htmlFor="mn">Nama menu</label><input id="mn" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
+    <Dialog title={item ? t("Ubah {name}", { name: item.name }) : t("Menu baru")} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>{t("Batal")}</button>
+      <button className="btn primary" onClick={save} disabled={busy || !name || !price}>{t("Simpan")}</button></>}>
+      <div className="field"><label htmlFor="mn">{t("Nama menu")}</label><input id="mn" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
       <div className="grid halves" style={{ gap: 10 }}>
-        <div className="field"><label htmlFor="mc">Kategori</label>
+        <div className="field"><label htmlFor="mc">{t("Kategori")}</label>
           <select id="mc" className="input" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-            {Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-        <div className="field"><label htmlFor="mp">Harga jual (Rp)</label>
+            {CATS.map((k) => <option key={k} value={k}>{catLabel(k)}</option>)}</select></div>
+        <div className="field"><label htmlFor="mp">{t("Harga jual (Rp)")}</label>
           <input id="mp" className="input" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, ""))} /></div>
       </div>
       <div className="field">
-        <label>Resep per porsi</label>
+        <span className="label">{t("Resep per porsi")}</span>
         {recipe.map((r, i) => {
           const g = byId.get(r.ingredient_id);
           return (
             <div key={i} className="row">
-              <select className="input grow" value={r.ingredient_id || ""} aria-label="Bahan"
+              <select className="input grow" value={r.ingredient_id || ""} aria-label={t("Bahan")}
                       onChange={(e) => setRecipe(recipe.map((x, j) => (j === i ? { ...x, ingredient_id: Number(e.target.value) } : x)))}>
-                <option value="">Pilih bahan…</option>
+                <option value="">{t("Pilih bahan…")}</option>
                 {ings.filter((g2) => g2.active).map((g2) => <option key={g2.id} value={g2.id}>{g2.name}</option>)}
               </select>
-              <input className="input" style={{ width: 90 }} inputMode="decimal" value={r.amount} aria-label="Jumlah"
+              <input className="input" style={{ width: 90 }} inputMode="decimal" value={r.amount} aria-label={t("Jumlah")}
                      onChange={(e) => setRecipe(recipe.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
               <span className="small muted" style={{ width: 44 }}>{g ? unitLabel(g.unit) : ""}</span>
-              <button className="btn small ghost" onClick={() => setRecipe(recipe.filter((_, j) => j !== i))} aria-label="Hapus bahan">✕</button>
+              <button className="btn small ghost" onClick={() => setRecipe(recipe.filter((_, j) => j !== i))} aria-label={t("Hapus bahan")}>✕</button>
             </div>
           );
         })}
-        <button className="btn small" style={{ alignSelf: "flex-start" }} onClick={() => setRecipe([...recipe, { ingredient_id: 0, amount: "" }])}>+ Bahan</button>
-        <span className="hint">Modal bahan per porsi ≈ {rupiah(cost)}{Number(price) > 0 && ` · margin ${pct(1 - cost / Number(price))}`}</span>
+        <button className="btn small" style={{ alignSelf: "flex-start" }} onClick={() => setRecipe([...recipe, { ingredient_id: 0, amount: "" }])}>{t("+ Bahan")}</button>
+        <span className="hint">{t("Modal bahan per porsi ≈ {rp}", { rp: rupiah(cost) })}{Number(price) > 0 && ` · ${t("untung {p} per porsi", { p: pct(1 - cost / Number(price)) })}`}</span>
+        {suggest(cost, margin) !== null && (
+          <div className="row wrap small">
+            <span>{t("Saran harga untuk untung {p}: {rp}", { p: pct(margin), rp: rupiah(suggest(cost, margin)!) })}</span>
+            {String(suggest(cost, margin)) !== price && <button type="button" className="btn small" onClick={() => setPrice(String(suggest(cost, margin)))}>{t("Pakai harga ini")}</button>}
+          </div>
+        )}
       </div>
-      <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Masih dijual</label>
+      <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{t("Masih dijual")}</label>
     </Dialog>
   );
 }
@@ -156,33 +173,33 @@ function IngredientDialog({ ing, onClose, onDone }: { ing: Ingredient | null; on
       shelf_life_days: Number(shelf || 1), lead_time_days: Number(lead || 0), active };
     try {
       if (ing) await api.put(`/ingredients/${ing.id}`, body); else await api.post("/ingredients", body);
-      toast("Bahan disimpan");
+      toast(t("Bahan disimpan"));
       onDone();
       onClose();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
 
   return (
-    <Dialog title={ing ? `Ubah ${ing.name}` : "Bahan baru"} onClose={onClose} footer={<>
-      <button className="btn" onClick={onClose}>Batal</button>
-      <button className="btn primary" onClick={save} disabled={busy || !name}>Simpan</button></>}>
-      <div className="field"><label htmlFor="gn">Nama bahan</label><input id="gn" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
-      <div className="field"><label>Satuan resep</label>
-        <Segmented label="Satuan" value={unit} onChange={setUnit} options={[{ value: "g", label: "gram" }, { value: "ml", label: "ml" }, { value: "pcs", label: "buah" }]} /></div>
+    <Dialog title={ing ? t("Ubah {name}", { name: ing.name }) : t("Bahan baru")} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>{t("Batal")}</button>
+      <button className="btn primary" onClick={save} disabled={busy || !name}>{t("Simpan")}</button></>}>
+      <div className="field"><label htmlFor="gn">{t("Nama bahan")}</label><input id="gn" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
+      <div className="field"><span className="label">{t("Satuan resep")}</span>
+        <Segmented label={t("Satuan resep")} value={unit} onChange={setUnit} options={[{ value: "g", label: t("gram") }, { value: "ml", label: "ml" }, { value: "pcs", label: t("buah") }]} /></div>
       <div className="grid halves" style={{ gap: 10 }}>
-        <div className="field"><label htmlFor="ps">Isi satu kemasan ({unitLabel(unit)})</label>
+        <div className="field"><label htmlFor="ps">{t("Isi satu kemasan ({u})", { u: unitLabel(unit) })}</label>
           <input id="ps" className="input" inputMode="decimal" value={packSize} onChange={(e) => setPackSize(e.target.value)} /></div>
-        <div className="field"><label htmlFor="pn">Nama kemasan</label>
-          <input id="pn" className="input" value={packName} onChange={(e) => setPackName(e.target.value)} placeholder="karung 5 kg, kg, dus…" /></div>
-        <div className="field"><label htmlFor="pp">Harga satu kemasan (Rp)</label>
+        <div className="field"><label htmlFor="pn">{t("Nama kemasan")}</label>
+          <input id="pn" className="input" value={packName} onChange={(e) => setPackName(e.target.value)} placeholder={t("karung 5 kg, kg, dus…")} /></div>
+        <div className="field"><label htmlFor="pp">{t("Harga satu kemasan (Rp)")}</label>
           <input id="pp" className="input" inputMode="numeric" value={packPrice} onChange={(e) => setPackPrice(e.target.value.replace(/\D/g, ""))} /></div>
-        <div className="field"><label htmlFor="sl">Tahan berapa hari</label>
+        <div className="field"><label htmlFor="sl">{t("Tahan berapa hari")}</label>
           <input id="sl" className="input" inputMode="numeric" value={shelf} onChange={(e) => setShelf(e.target.value.replace(/\D/g, ""))} /></div>
-        <div className="field"><label htmlFor="lt">Dipesan, datang setelah (hari)</label>
+        <div className="field"><label htmlFor="lt">{t("Dipesan, datang setelah (hari)")}</label>
           <input id="lt" className="input" inputMode="numeric" value={lead} onChange={(e) => setLead(e.target.value.replace(/\D/g, ""))} />
-          <span className="hint">0 kalau bisa dibeli langsung di warung sebelah</span></div>
+          <span className="hint">{t("0 kalau bisa dibeli langsung di warung sebelah")}</span></div>
       </div>
-      <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Masih dipakai</label>
+      <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{t("Masih dipakai")}</label>
     </Dialog>
   );
 }
@@ -197,15 +214,15 @@ function CatalogDialog({ business, onClose, onDone }: { business: Business; onCl
   const toggle = (k: string) => { const s = new Set(picked); if (s.has(k)) s.delete(k); else s.add(k); setPicked(s); };
   const save = async () => {
     setBusy(true);
-    try { const r = await api.post<{ added: number }>("/catalog/apply", { items: [...picked] }); toast(`${r.added} menu ditambahkan`); onDone(); onClose(); }
+    try { const r = await api.post<{ added: number }>("/catalog/apply", { items: [...picked] }); toast(t("{n} menu ditambahkan", { n: r.added })); onDone(); onClose(); }
     catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   return (
-    <Dialog title="Tambah dari contoh menu" onClose={onClose} footer={<>
-      <button className="btn" onClick={onClose}>Batal</button>
-      <button className="btn primary" onClick={save} disabled={busy || picked.size === 0}>Tambah {picked.size || ""} menu</button></>}>
-      <Segmented label="Jenis usaha" value={biz} onChange={setBiz} options={[{ value: "warung_makan", label: "Warung makan" }, { value: "kafe", label: "Kafe" }]} />
-      <span className="small muted">Harga dan resep bisa diubah setelah ditambahkan. Bahan yang dibutuhkan ikut dibuat.</span>
+    <Dialog title={t("Tambah dari contoh menu")} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>{t("Batal")}</button>
+      <button className="btn primary" onClick={save} disabled={busy || picked.size === 0}>{t("Tambah {n} menu", { n: picked.size || "" })}</button></>}>
+      <Segmented label={t("Jenis usaha")} value={biz} onChange={setBiz} options={[{ value: "warung_makan", label: t("Warung makan") }, { value: "kafe", label: t("Kafe") }]} />
+      <span className="small muted">{t("Harga dan resep bisa diubah setelah ditambahkan. Bahan yang dibutuhkan ikut dibuat.")}</span>
       {!cat.data ? <Loading /> : cat.data.items.map((it) => (
         <label key={it.key} className="check" style={{ alignItems: "flex-start" }}>
           <input type="checkbox" checked={picked.has(it.key)} onChange={() => toggle(it.key)} style={{ marginTop: 3 }} />

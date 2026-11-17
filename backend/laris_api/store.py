@@ -19,7 +19,17 @@ DEFAULTS = {
     "service_level": "0.9",  # how sure the shopping list should be that nothing runs out
     "timezone": "Asia/Jakarta",
     "data_version": "0",
+    "owner_name": "",
+    "location": "lainnya",       # kantor, kampus, perumahan, wisata, pasar, lainnya
+    "city": "",
+    "open_days": "0,1,2,3,4,5,6",  # weekdays the shop opens, 0 = Monday
+    "target_revenue": "0",      # monthly revenue target, 0 = none
+    "target_margin": "0.6",     # wished share of the price left after ingredients
+    "language": "id",
 }
+
+EXPENSE_CATEGORIES = ("gas", "listrik_air", "sewa", "gaji", "kemasan", "transport", "lainnya")
+LOCATIONS = ("kantor", "kampus", "perumahan", "wisata", "pasar", "lainnya")
 
 
 def get(s: Session, key: str) -> str:
@@ -125,9 +135,20 @@ def sales_frame(s: Session, start: date, end: date) -> list[DailySale]:
     return list(s.scalars(select(DailySale).where(DailySale.day >= start, DailySale.day <= end)))
 
 
-def closed_days(s: Session, start: date, end: date) -> dict[date, str]:
-    return {r.day: r.note for r in s.scalars(select(DayStatus).where(DayStatus.day >= start, DayStatus.day <= end,
-                                                                      DayStatus.closed))}
+def closed_days(s: Session, start: date, end: date, include_off: bool = True) -> dict[date, str]:
+    """Days marked closed. With include_off, the shop's regular days off count too, unless sales
+    were recorded on them (the owner opened after all)."""
+    out = {r.day: r.note for r in s.scalars(select(DayStatus).where(DayStatus.day >= start, DayStatus.day <= end,
+                                                                     DayStatus.closed))}
+    off = off_weekdays(s) if include_off else set()
+    if off:
+        rec = recorded_days(s, start, end)
+        d = start
+        while d <= end:
+            if d.weekday() in off and d not in rec and d not in out:
+                out[d] = "libur rutin"
+            d += timedelta(days=1)
+    return out
 
 
 def recorded_days(s: Session, start: date, end: date) -> set[date]:
@@ -142,3 +163,10 @@ def promo_days(s: Session, start: date, end: date) -> dict[tuple[int, date], boo
             out[(p.item_id, d)] = True
             d += timedelta(days=1)
     return out
+
+
+def off_weekdays(s: Session) -> set[int]:
+    """Weekdays the owner said the shop does not open."""
+    raw = get(s, "open_days")
+    open_ = {int(x) for x in raw.split(",") if x.strip().isdigit() and 0 <= int(x) <= 6} if raw else set(range(7))
+    return set(range(7)) - open_ if open_ else set()

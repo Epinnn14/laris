@@ -76,9 +76,9 @@ jobs:
       - run: pip install -e ./ml -e ./backend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - name: e2e in demo mode
+      - name: e2e on a new shop (sign-up wizard, both themes, both languages)
         run: |
-          LARIS_DEMO_MODE=1 LARIS_DATABASE_URL=sqlite:////tmp/e2e.db uvicorn laris_api.main:app --port 8000 &
+          LARIS_DATABASE_URL=sqlite:////tmp/e2e.db uvicorn laris_api.main:app --port 8000 &
           for i in $(seq 60); do curl -sf localhost:8000/api/health && break; sleep 1; done
           cd frontend && node e2e.mjs http://localhost:8000 ../shots
       - uses: actions/upload-artifact@v4

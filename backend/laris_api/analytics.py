@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import store
-from .models import StockMove
+from .models import Expense, StockMove
 
 DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 
@@ -45,6 +45,36 @@ def _period(s: Session, start: date, end: date, items: dict) -> dict:
             "portions": sum(v["portions"] for v in by_day.values()), "open_days": len(open_days)}
 
 
+def waste_cost(s: Session, start: date, end: date) -> float:
+    rows = s.execute(select(StockMove).where(StockMove.kind == "buang", StockMove.day >= start,
+                                             StockMove.day <= end)).scalars().all()
+    ing_cost = {g.id: g.cost_per_unit for g in store.ingredients(s, active_only=False)}
+    return sum(-m.qty * ing_cost.get(m.ingredient_id, 0) for m in rows)
+
+
+def expenses(s: Session, start: date, end: date) -> dict[str, float]:
+    out: dict[str, float] = defaultdict(float)
+    for e in s.scalars(select(Expense).where(Expense.day >= start, Expense.day <= end)):
+        out[e.category] += e.amount
+    return dict(out)
+
+
+def money(s: Session, start: date, end: date, items: dict) -> dict:
+    """Revenue down to net profit for a period: what came in, what the sold portions cost in
+    ingredients, what was thrown away, and the other costs of running the shop."""
+    p = _period(s, start, end, items)
+    w = waste_cost(s, start, end)
+    ex = expenses(s, start, end)
+    gross = p["revenue"] - p["cost"]
+    return {**p, "gross": gross, "waste": w, "expenses": ex, "expense_total": sum(ex.values()),
+            "net": gross - w - sum(ex.values())}
+
+
+def item_table(s: Session) -> dict:
+    return {it.id: {"name": it.name, "category": it.category, "price": it.price, "cost": unit_cost(it),
+                    "active": it.active} for it in store.menu(s, active_only=False)}
+
+
 def _change(now: float, before: float) -> float | None:
     return None if before == 0 else round((now - before) / before, 3)
 
@@ -55,11 +85,9 @@ def dashboard(s: Session, days: int = 30) -> dict:
     start = end - timedelta(days=days - 1)
     prev_end = start - timedelta(days=1)
     prev_start = prev_end - timedelta(days=days - 1)
-    menu = store.menu(s, active_only=False)
-    items = {it.id: {"name": it.name, "category": it.category, "price": it.price, "cost": unit_cost(it),
-                     "active": it.active} for it in menu}
-    cur = _period(s, start, end, items)
-    prev = _period(s, prev_start, prev_end, items)
+    items = item_table(s)
+    cur = money(s, start, end, items)
+    prev = money(s, prev_start, prev_end, items)
 
     # daily series with a "how busy" label against the same weekday's usual level
     hist = _period(s, start - timedelta(days=56), end, items)
@@ -68,6 +96,11 @@ def dashboard(s: Session, days: int = 30) -> dict:
         if d not in hist["closed"] and v["portions"] > 0:
             by_dow[d.weekday()].append(v["portions"])
     typical = {k: float(np.median(v)) for k, v in by_dow.items()}
+    rev_dow = defaultdict(list)
+    for d, v in hist["by_day"].items():
+        if d not in hist["closed"] and v["revenue"] > 0:
+            rev_dow[d.weekday()].append(v["revenue"])
+    usual = {k: round(float(np.median(v))) for k, v in rev_dow.items()}
     series = []
     d = start
     while d <= end:
@@ -80,6 +113,7 @@ def dashboard(s: Session, days: int = 30) -> dict:
         series.append({"date": d.isoformat(), "revenue": round(v["revenue"]) if v else 0,
                        "portions": v["portions"] if v else 0, "profit": round(v["revenue"] - v["cost"]) if v else 0,
                        "closed": closed, "recorded": v is not None, "level": level,
+                       "usual": usual.get(d.weekday(), 0),
                        "note": cur["closed"].get(d, "")})
         d += timedelta(days=1)
 
@@ -106,10 +140,9 @@ def dashboard(s: Session, days: int = 30) -> dict:
     for iid, v in cur["by_item"].items():
         cats[items[iid]["category"]] += v["revenue"]
 
-    waste = s.execute(select(StockMove).where(StockMove.kind == "buang", StockMove.day >= start,
-                                              StockMove.day <= end)).scalars().all()
-    ing_cost = {g.id: g.cost_per_unit for g in store.ingredients(s, active_only=False)}
-    waste_cost = sum(-m.qty * ing_cost.get(m.ingredient_id, 0) for m in waste)
+    open_series = [x for x in series if x["recorded"] and not x["closed"]]
+    best = max(open_series, key=lambda x: x["revenue"], default=None)
+    quiet = min(open_series, key=lambda x: x["revenue"], default=None)
 
     return {
         "period": {"start": start.isoformat(), "end": end.isoformat(), "days": days},
@@ -119,8 +152,13 @@ def dashboard(s: Session, days: int = 30) -> dict:
             "profit_change": _change(cur["revenue"] - cur["cost"], prev["revenue"] - prev["cost"]),
             "portions": cur["portions"], "portions_change": _change(cur["portions"], prev["portions"]),
             "avg_per_open_day": round(cur["revenue"] / cur["open_days"]) if cur["open_days"] else 0,
-            "open_days": cur["open_days"], "waste_cost": round(waste_cost),
+            "open_days": cur["open_days"], "waste_cost": round(cur["waste"]),
+            "ingredient_cost": round(cur["cost"]), "expenses": round(cur["expense_total"]),
+            "net_profit": round(cur["net"]), "net_change": _change(cur["net"], prev["net"]) if prev["net"] > 0 else None,
+            "best_day": {"date": best["date"], "revenue": best["revenue"]} if best else None,
+            "quiet_day": {"date": quiet["date"], "revenue": quiet["revenue"]} if quiet else None,
         },
+        "expenses": [{"category": k, "amount": round(v)} for k, v in sorted(cur["expenses"].items(), key=lambda x: -x[1])],
         "series": series, "items": top, "weekday": weekday,
         "categories": [{"category": k, "revenue": round(v)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
     }

@@ -12,7 +12,7 @@ def test_setup_login_and_auth_required(client):
     assert client.post("/api/login", json={"password": "salah"}).status_code == 401
     assert client.post("/api/login", json={"password": "rahasia"}).status_code == 200
     assert client.get("/api/state").json()["authed"] is True
-    assert client.post("/api/setup", json={"shop_name": "x", "password": "abcd"}).status_code == 409
+    assert client.post("/api/setup", json={"shop_name": "x", "password": "abcdef"}).status_code == 409
 
 
 def test_recording_sales_books_ingredients(owner):
@@ -83,3 +83,68 @@ def test_export_csv(owner):
     owner.put("/api/sales/2026-11-16", json={"entries": [{"item_id": item, "qty": 3}]})
     r = owner.get("/api/export/sales.csv")
     assert r.status_code == 200 and "2026-11-16,Es Teh Manis,minuman_dingin,5000,3,0,0,15000" in r.text
+
+
+def test_setup_with_full_profile_and_catalog(client):
+    r = client.post("/api/setup", json={
+        "shop_name": "Warung Laba", "owner_name": "Pak Dodi", "business": "warung_makan", "location": "pasar",
+        "city": "Solo", "open_days": [0, 1, 2, 3, 4, 5], "cycle_days": 2, "target_revenue": 30_000_000,
+        "target_margin": 0.65, "language": "en", "password": "rahasia1", "start": "catalog",
+        "catalog_items": ["nasgor", "esteh"]})
+    assert r.status_code == 200
+    st = client.get("/api/settings").json()
+    assert st["owner_name"] == "Pak Dodi" and st["open_days"] == [0, 1, 2, 3, 4, 5] and st["language"] == "en"
+    assert st["cycle_days"] == 2 and st["target_revenue"] == 30_000_000 and st["target_margin"] == 0.65
+    assert client.get("/api/state").json()["language"] == "en"
+    menu = client.get("/api/menu").json()
+    assert len(menu) == 2
+    for m in menu:  # suggested price leaves 65% after ingredients, rounded up to Rp500
+        assert m["suggested_price"] % 500 == 0 and 1 - m["unit_cost"] / m["suggested_price"] >= 0.65
+    # the shop never opens on Sunday: Sundays are closed in the forecast without marking each one
+    f = client.get("/api/forecast").json()
+    assert 6 in f["weekly_off"]
+    assert all(f["closed"][k] for k, d in enumerate(f["dates"]) if date.fromisoformat(d).weekday() == 6)
+    t = client.get("/api/dashboard").json()["target"]  # no sales yet: no guess about the month end
+    assert t["goal"] == 30_000_000 and t["done"] == 0 and t["projected"] is None and t["chance"] is None
+    assert client.put("/api/settings", json={"open_days": []}).status_code == 422
+    assert client.post("/api/setup", json={"shop_name": "x", "password": "123"}).status_code == 422
+
+
+def test_expenses_make_net_profit(owner):
+    owner.post("/api/catalog/apply", json={"items": ["nasgor"]})
+    item = owner.get("/api/menu").json()[0]
+    owner.put("/api/sales/2026-11-16", json={"entries": [{"item_id": item["id"], "qty": 10}]})
+    assert owner.post("/api/expenses", json={"day": "2026-11-16", "category": "gas", "amount": 25000}).status_code == 201
+    assert owner.post("/api/expenses", json={"day": "2026-11-20", "category": "gas", "amount": 1}).status_code == 422
+    assert owner.post("/api/expenses", json={"day": "2026-11-16", "category": "pajak", "amount": 1}).status_code == 422
+    k = owner.get("/api/dashboard?days=7").json()["kpi"]
+    assert k["revenue"] == 10 * item["price"] and k["expenses"] == 25000
+    assert k["net_profit"] == k["profit"] - k["waste_cost"] - 25000
+    ex = owner.get("/api/expenses").json()
+    assert len(ex) == 1
+    owner.delete(f"/api/expenses/{ex[0]['id']}")
+    assert owner.get("/api/expenses").json() == []
+
+
+def test_weekly_summary_and_target(owner):
+    owner.post("/api/demo", json={"business": "warung_makan"})
+    w = owner.get("/api/summary").json()
+    assert w["start"] == "2026-11-10" and w["end"] == "2026-11-16" and len(w["days"]) == 7
+    assert w["revenue"] > 0 and w["net"] < w["gross"]
+    assert w["next_week"]["revenue"][0] <= w["next_week"]["revenue"][1] <= w["next_week"]["revenue"][2]
+    t = w["target"]
+    assert t["goal"] > 0 and t["month"] == "2026-11" and t["projected"][1] > t["done"] and 0 <= t["chance"] <= 1
+    assert owner.get("/api/dashboard").json()["target"]["goal"] == t["goal"]
+
+
+def test_what_if_price_and_promo(owner):
+    owner.post("/api/demo", json={"business": "kafe"})
+    item = owner.get("/api/menu").json()[0]
+    up = owner.post("/api/simulate", json={"item_id": item["id"], "new_price": item["price"] + 3000}).json()
+    assert up["base"]["item_qty"][1] > up["what_if"]["item_qty"][1]
+    assert up["new_price"] == item["price"] + 3000 and up["method"] == "larisnet"
+    pr = owner.post("/api/simulate", json={"item_id": item["id"], "promo_start": "2026-11-18",
+                                           "promo_end": "2026-11-24"}).json()
+    assert pr["promo_note"] is None and pr["what_if"]["item_qty"][1] > pr["base"]["item_qty"][1]
+    assert owner.post("/api/simulate", json={"item_id": 99999}).status_code == 404
+    assert owner.post("/api/simulate", json={"item_id": item["id"], "sensitivity": "x"}).status_code == 422

@@ -93,3 +93,14 @@ class StockMove(Base):
     cost: Mapped[float] = mapped_column(Float, default=0)  # rupiah paid (beli)
     note: Mapped[str] = mapped_column(String(200), default="")
     auto: Mapped[bool] = mapped_column(Boolean, default=False)  # created from recorded sales
+
+
+class Expense(Base):
+    """Money spent on running the shop that is not an ingredient: gas, electricity, rent, wages,
+    packaging, transport. Ingredients are tracked as stock, so net profit does not count them twice."""
+    __tablename__ = "expenses"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    category: Mapped[str] = mapped_column(String(32))  # gas, listrik_air, sewa, gaji, kemasan, transport, lainnya
+    amount: Mapped[float] = mapped_column(Float)
+    note: Mapped[str] = mapped_column(String(200), default="")

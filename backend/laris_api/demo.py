@@ -19,14 +19,14 @@ from laris_ml import synth
 from laris_ml.catalog import INGREDIENTS
 
 from . import store
-from .models import DailySale, DayStatus, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
+from .models import DailySale, DayStatus, Expense, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
 
 LOCATION = {"warung_makan": "kantor", "kafe": "kampus"}
 NAMES = {"warung_makan": "Warung Bu Sri (contoh)", "kafe": "Kopi Senja (contoh)"}
 
 
 def clear(s: Session) -> None:
-    for t in (StockMove, DailySale, DayStatus, PromoPlan, RecipeLine, MenuItem, Ingredient):
+    for t in (StockMove, DailySale, DayStatus, PromoPlan, RecipeLine, MenuItem, Ingredient, Expense):
         s.execute(delete(t))
 
 
@@ -61,6 +61,7 @@ def load(s: Session, business: str = "warung_makan", days: int = 400, end: date 
         off = (sr.dates[0].date() - start).days
         closed_any[off:off + len(sr.closed)] |= sr.closed
     sales_rows = []
+    items_price = {it.id: it.price for it, _ in items.values()}
     for it, sr in items.values():
         for d, q, so, pr, cl in zip(sr.dates, sr.qty, sr.stockout, sr.promo, sr.closed):
             if not cl:
@@ -112,6 +113,48 @@ def load(s: Session, business: str = "warung_makan", days: int = 400, end: date 
         moves.append({"day": last, "ingredient_id": g.id, "kind": "opname", "qty": float(target - stock),
                       "cost": 0.0, "note": "hitung stok", "auto": False})
     s.execute(StockMove.__table__.insert(), moves)
+    s.execute(Expense.__table__.insert(), demo_expenses(start, last, business, closed_any, rng))
+    # profile of the demo shop, so every page has something to show
+    store.put(s, "owner_name", "Bu Sri" if business == "warung_makan" else "Raka")
+    store.put(s, "location", LOCATION[business])
+    store.put(s, "city", "Bandung")
+    off = sorted({(start + timedelta(days=int(k))).weekday() for k in range(days)
+                  if all(closed_any[j] for j in range(k % 7, days, 7))})
+    store.put(s, "open_days", ",".join(str(d) for d in range(7) if d not in off))
+    month_rev = sum(r["qty"] * items_price[r["item_id"]] for r in sales_rows if r["day"] > last - timedelta(days=30))
+    store.put(s, "target_revenue", str(int(-(-month_rev // 5_000_000) * 5_000_000)))
     store.bump(s)
     s.commit()
     return {"items": len(items), "ingredients": len(ings), "days": days, "sales_rows": len(sales_rows)}
+
+
+# Running costs of the demo shop (clearly a made-up example, like its name says).
+DEMO_COSTS = {
+    # (amount, every n days) or a monthly bill; weekly items are paid on Saturday
+    "warung_makan": {"gas": (48_000, 1), "gaji": (1_800_000, 7), "kemasan": (150_000, 7), "transport": (25_000, 2),
+                     "listrik_air": 650_000, "sewa": 2_500_000},
+    "kafe": {"gas": (24_000, 2), "gaji": (2_400_000, 7), "kemasan": (250_000, 7), "transport": (20_000, 3),
+             "listrik_air": 1_200_000, "sewa": 3_500_000},
+}
+
+
+def demo_expenses(start: date, last: date, business: str, closed: np.ndarray, rng) -> list[dict]:
+    costs = DEMO_COSTS[business]
+    rows = []
+    d, k = start, 0
+    while d <= last:
+        for cat, v in costs.items():
+            if isinstance(v, tuple):
+                amount, every = v
+                due = d.weekday() == 5 if every == 7 else k % every == every - 1
+                if due and not closed[k]:
+                    rows.append({"day": d, "category": cat, "amount": float(round(amount * rng.uniform(0.9, 1.1), -3)),
+                                 "note": ""})
+            elif cat == "sewa" and d.day == 1:
+                rows.append({"day": d, "category": cat, "amount": float(v), "note": ""})
+            elif cat == "listrik_air" and d.day == 5:
+                rows.append({"day": d, "category": cat, "amount": float(round(v * rng.uniform(0.9, 1.15), -3)),
+                             "note": ""})
+        d += timedelta(days=1)
+        k += 1
+    return rows

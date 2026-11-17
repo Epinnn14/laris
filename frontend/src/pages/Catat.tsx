@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type Dashboard, type SalesDay } from "../api";
-import { CATEGORY_LABEL, addDays, dayLong, dayWithName, num, rupiah } from "../format";
+import { addDays, catLabel, dayLong, dayWithName, num, rupiah } from "../format";
+import { t, useLang } from "../i18n";
 import { ErrorBox, Loading, PageHead, toast, useApi } from "../ui";
 
 type Entry = SalesDay["entries"][number];
 
 export default function Catat({ today, initialDay }: { today: string; initialDay: string | null }) {
+  useLang();
   const [day, setDay] = useState(initialDay && initialDay <= today ? initialDay : today);
   const sales = useApi<SalesDay>(`/sales?day=${day}`, [day]);
   const week = useApi<Dashboard>("/dashboard?days=7");
@@ -41,7 +43,7 @@ export default function Catat({ today, initialDay }: { today: string; initialDay
       });
       sales.setData(res);
       week.reload();
-      toast(closed ? "Hari tutup disimpan" : `Tersimpan: ${num(portions)} porsi, ${rupiah(total)}`);
+      toast(closed ? t("Hari tutup disimpan") : t("Tersimpan: {n} porsi, {rp}", { n: num(portions), rp: rupiah(total) }));
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -50,7 +52,7 @@ export default function Catat({ today, initialDay }: { today: string; initialDay
   };
 
   const go = (d: string) => {
-    if (dirty && !confirm("Perubahan belum disimpan. Pindah hari?")) return;
+    if (dirty && !confirm(t("Perubahan belum disimpan. Pindah hari?"))) return;
     setDay(d);
   };
 
@@ -62,19 +64,19 @@ export default function Catat({ today, initialDay }: { today: string; initialDay
 
   return (
     <>
-      <PageHead title="Catat penjualan" sub="Isi jumlah porsi yang terjual hari itu. Stok bahan ikut berkurang otomatis sesuai resep.">
+      <PageHead title={t("Catat penjualan")} sub={t("Isi jumlah porsi yang terjual hari itu. Stok bahan ikut berkurang otomatis sesuai resep.")}>
         <div className="row">
-          <button className="btn small" onClick={() => go(addDays(day, -1))} aria-label="Hari sebelumnya">‹</button>
-          <input className="input" type="date" value={day} max={today} aria-label="Tanggal"
+          <button className="btn small" onClick={() => go(addDays(day, -1))} aria-label={t("Hari sebelumnya")}>‹</button>
+          <input className="input" type="date" value={day} max={today} aria-label={t("Tanggal")}
                  onChange={(e) => e.target.value && go(e.target.value)} style={{ width: 160, minHeight: 36 }} />
-          <button className="btn small" onClick={() => go(addDays(day, 1))} disabled={day >= today} aria-label="Hari berikutnya">›</button>
+          <button className="btn small" onClick={() => go(addDays(day, 1))} disabled={day >= today} aria-label={t("Hari berikutnya")}>›</button>
         </div>
       </PageHead>
 
       {missing.length > 0 && (
-        <div className="alert info" style={{ marginBottom: 14 }}>
+        <div className="alert info" style={{ marginBottom: 16 }}>
           <div className="grow">
-            Belum dicatat:{" "}
+            {t("Belum dicatat:")}{" "}
             <span className="chips" style={{ display: "inline-flex", marginTop: 6 }}>
               {missing.map((m) => <button key={m.date} className="chip" onClick={() => go(m.date)}>{dayWithName(m.date)}</button>)}
             </span>
@@ -88,42 +90,42 @@ export default function Catat({ today, initialDay }: { today: string; initialDay
           <div className="card-head">
             <div>
               <h2>{dayLong(day)}</h2>
-              <p className="small muted">{sales.data.recorded ? "Sudah pernah dicatat, bisa diubah" : "Belum dicatat"}</p>
+              <p className="small muted">{sales.data.recorded ? t("Sudah pernah dicatat, bisa diubah") : t("Belum dicatat")}</p>
             </div>
             <label className="check"><input type="checkbox" checked={closed} onChange={(e) => { setClosed(e.target.checked); setDirty(true); }} />
-              Tutup hari ini</label>
+              {t("Tutup hari ini")}</label>
           </div>
           <div className="card-body">
             {closed ? (
               <div className="field">
-                <label htmlFor="note">Keterangan (opsional)</label>
-                <input id="note" className="input" value={note} placeholder="Contoh: libur Lebaran, sakit"
+                <label htmlFor="note">{t("Keterangan (opsional)")}</label>
+                <input id="note" className="input" value={note} placeholder={t("Contoh: libur Lebaran, sakit")}
                        onChange={(e) => { setNote(e.target.value); setDirty(true); }} />
-                <span className="hint">Hari tutup tidak dihitung sebagai hari sepi, dan prediksi tahu tokonya tutup.</span>
+                <span className="hint">{t("Hari tutup tidak dihitung sebagai hari sepi, dan prediksi tahu tokonya tutup.")}</span>
               </div>
             ) : entries.length === 0 ? (
-              <div className="empty">Belum ada menu. <a href="#/menu">Tambahkan menu dulu</a>.</div>
+              <div className="empty">{t("Belum ada menu.")} <a href="#/menu">{t("Tambahkan menu dulu")}</a>.</div>
             ) : (
               <div className="stack" style={{ gap: 18 }}>
                 {groups.map(([cat, es]) => (
                   <section key={cat}>
-                    <h3 className="muted" style={{ marginBottom: 4 }}>{CATEGORY_LABEL[cat as Entry["category"]]}</h3>
+                    <h3 className="muted" style={{ marginBottom: 4 }}>{catLabel(cat as Entry["category"])}</h3>
                     {es.map((e) => (
-                      <div key={e.item_id} className="row wrap" style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                      <div key={e.item_id} className="row wrap" style={{ padding: "10px 0", borderBottom: "1px solid var(--rule)" }}>
                         <div className="grow" style={{ minWidth: 150 }}>
                           <div style={{ fontWeight: 600 }}>{e.name}</div>
-                          <div className="small muted num">{rupiah(e.price)}{e.qty > 0 && ` · subtotal ${rupiah(e.qty * e.price)}`}</div>
-                          <div className="row" style={{ gap: 14 }}>
-                            <label className="check small" title="Menu ini habis sebelum warung tutup"><input type="checkbox" checked={e.stockout} onChange={(x) => set(e.item_id, { stockout: x.target.checked })} />Habis duluan</label>
-                            <label className="check small"><input type="checkbox" checked={e.promo} onChange={(x) => set(e.item_id, { promo: x.target.checked })} />Promo</label>
-                          </div>
+                          <div className="small muted num">{rupiah(e.price)}{e.qty > 0 && ` · ${t("subtotal {rp}", { rp: rupiah(e.qty * e.price) })}`}</div>
                         </div>
-                        <div className="stepper" role="group" aria-label={`Jumlah ${e.name}`}>
-                          <button type="button" onClick={() => set(e.item_id, { qty: Math.max(0, e.qty - 1) })} aria-label="Kurangi">−</button>
-                          <input type="number" inputMode="numeric" min={0} value={e.qty} aria-label={`Jumlah ${e.name}`}
+                        <div className="stepper" role="group" aria-label={t("Jumlah {name}", { name: e.name })}>
+                          <button type="button" onClick={() => set(e.item_id, { qty: Math.max(0, e.qty - 1) })} aria-label={t("Kurangi")}>−</button>
+                          <input type="number" inputMode="numeric" min={0} value={e.qty} aria-label={t("Jumlah {name}", { name: e.name })}
                                  onFocus={(x) => x.target.select()}
                                  onChange={(x) => set(e.item_id, { qty: Math.max(0, parseInt(x.target.value || "0", 10) || 0) })} />
-                          <button type="button" onClick={() => set(e.item_id, { qty: e.qty + 1 })} aria-label="Tambah">+</button>
+                          <button type="button" onClick={() => set(e.item_id, { qty: e.qty + 1 })} aria-label={t("Tambah")}>+</button>
+                        </div>
+                        <div className="row" style={{ gap: 16, flexBasis: "100%" }}>
+                          <label className="check small" title={t("Menu ini habis sebelum warung tutup")}><input type="checkbox" checked={e.stockout} onChange={(x) => set(e.item_id, { stockout: x.target.checked })} />{t("Habis duluan")}</label>
+                          <label className="check small"><input type="checkbox" checked={e.promo} onChange={(x) => set(e.item_id, { promo: x.target.checked })} />{t("Promo")}</label>
                         </div>
                       </div>
                     ))}
@@ -134,13 +136,13 @@ export default function Catat({ today, initialDay }: { today: string; initialDay
           </div>
           <div className="sticky-save">
             <div className="grow">
-              {closed ? <span className="muted">Toko tutup</span> : <>
-                <div style={{ fontWeight: 700 }} className="num">{rupiah(total)}</div>
-                <div className="small muted num">{num(portions)} porsi</div>
+              {closed ? <span className="muted">{t("Toko tutup")}</span> : <>
+                <div className="fig" style={{ fontSize: 20 }}>{rupiah(total)}</div>
+                <div className="small muted num">{t("{n} porsi", { n: num(portions) })}</div>
               </>}
             </div>
             <button className="btn primary" onClick={save} disabled={saving || (!dirty && sales.data.recorded)}>
-              {saving ? "Menyimpan…" : "Simpan"}
+              {saving ? t("Menyimpan…") : t("Simpan")}
             </button>
           </div>
         </div>

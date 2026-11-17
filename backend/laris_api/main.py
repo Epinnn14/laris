@@ -22,32 +22,60 @@ from sqlalchemy.orm import Session
 from laris_ml import features as F
 from laris_ml.catalog import BUSINESS_TYPES, CATEGORIES, INGREDIENTS, MENUS
 
-from . import analytics, auth, demo, store
+from . import analytics, auth, demo, store, summary
 from .db import Database
-from .forecasting import Forecasts
-from .models import DailySale, DayStatus, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
+from .forecasting import SENSITIVITY, Forecasts, scenario
+from .models import DailySale, DayStatus, Expense, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
 
 Q10, Q50, Q90 = (F.QUANTILES.index(q) for q in (0.1, 0.5, 0.9))
 
 
 # ------------------------------------------------------------------ request bodies
 
-class SetupIn(BaseModel):
+class Profile(BaseModel):
+    shop_name: str | None = Field(default=None, min_length=1, max_length=80)
+    owner_name: str | None = Field(default=None, max_length=80)
+    business: str | None = None
+    location: str | None = None
+    city: str | None = Field(default=None, max_length=80)
+    open_days: list[int] | None = None
+    cycle_days: int | None = Field(default=None, ge=1, le=14)
+    service_level: float | None = Field(default=None, ge=0.5, le=0.99)
+    target_revenue: int | None = Field(default=None, ge=0, le=10_000_000_000)
+    target_margin: float | None = Field(default=None, ge=0.05, le=0.95)
+    language: str | None = Field(default=None, pattern="^(id|en)$")
+
+
+class SetupIn(Profile):
     shop_name: str = Field(min_length=1, max_length=80)
     business: str = "warung_makan"
-    password: str = Field(min_length=4, max_length=128)
-    demo: bool = False
+    password: str = Field(min_length=6, max_length=128)
+    start: str = Field(default="empty", pattern="^(empty|demo|catalog)$")
+    demo: bool = False                 # older clients
+    catalog_items: list[str] = []
 
 
 class LoginIn(BaseModel):
     password: str
 
 
-class SettingsIn(BaseModel):
-    shop_name: str | None = Field(default=None, max_length=80)
-    business: str | None = None
-    cycle_days: int | None = Field(default=None, ge=1, le=14)
-    service_level: float | None = Field(default=None, ge=0.5, le=0.99)
+class SettingsIn(Profile):
+    pass
+
+
+class ExpenseIn(BaseModel):
+    day: date
+    category: str
+    amount: float = Field(gt=0, le=1_000_000_000)
+    note: str = Field(default="", max_length=200)
+
+
+class SimulateIn(BaseModel):
+    item_id: int
+    new_price: int | None = Field(default=None, gt=0, le=100_000_000)
+    promo_start: date | None = None
+    promo_end: date | None = None
+    sensitivity: str = "sedang"
 
 
 class RecipeIn(BaseModel):
@@ -168,22 +196,22 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         return {"setup_needed": not has_pw and not demo_mode,
                 "authed": demo_mode or (has_pw and auth.check_token(secret(s), token)),
                 "demo_mode": demo_mode, "shop_name": store.get(s, "shop_name"), "business": store.get(s, "business"),
+                "owner_name": store.get(s, "owner_name"), "language": store.get(s, "language"),
                 "today": store.today(s).isoformat(), "model": forecasts.info()}
 
     @app.post("/api/setup")
     def setup(body: SetupIn, resp: Response, s: Session = Depends(session)):
         if store.get(s, "password"):
             raise HTTPException(409, "Toko sudah dibuat. Silakan masuk.")
-        if body.business not in BUSINESS_TYPES:
-            raise HTTPException(422, "Jenis usaha tidak dikenal")
+        check_profile(body)
         store.put(s, "password", auth.hash_password(body.password))
-        store.put(s, "shop_name", body.shop_name)
-        store.put(s, "business", body.business)
-        s.commit()
-        if body.demo:
+        start = "demo" if body.demo else body.start
+        if start == "demo":
             demo.load(s, body.business)
-            store.put(s, "shop_name", body.shop_name)
-            s.commit()
+        save_profile(s, body)
+        if start == "catalog" and body.catalog_items:
+            apply_catalog(s, body.catalog_items)
+        s.commit()
         login_cookie(resp, s)
         return {"ok": True}
 
@@ -200,32 +228,56 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         resp.delete_cookie(auth.COOKIE)
         return {"ok": True}
 
+    def check_profile(body: Profile) -> None:
+        if body.business is not None and body.business not in BUSINESS_TYPES:
+            raise HTTPException(422, "Jenis usaha tidak dikenal")
+        if body.location is not None and body.location not in store.LOCATIONS:
+            raise HTTPException(422, "Lokasi tidak dikenal")
+        if body.open_days is not None and (not body.open_days or any(d < 0 or d > 6 for d in body.open_days)):
+            raise HTTPException(422, "Pilih minimal satu hari buka")
+
+    def save_profile(s: Session, body: Profile) -> None:
+        for k, v in body.model_dump(exclude_none=True, include=set(Profile.model_fields)).items():
+            store.put(s, k, ",".join(str(d) for d in sorted(set(v))) if k == "open_days" else str(v))
+        store.bump(s)
+
     @app.get("/api/settings")
     def get_settings(s: Session = Depends(authed)):
-        return {k: store.get(s, k) for k in ("shop_name", "business", "cycle_days", "service_level")}
+        out = {k: store.get(s, k) for k in Profile.model_fields}
+        out["open_days"] = sorted(set(range(7)) - store.off_weekdays(s))
+        for k in ("cycle_days", "target_revenue"):
+            out[k] = int(float(out[k] or 0))
+        for k in ("service_level", "target_margin"):
+            out[k] = float(out[k] or 0)
+        return out
 
     @app.put("/api/settings")
     def put_settings(body: SettingsIn, s: Session = Depends(authed)):
-        if body.business and body.business not in BUSINESS_TYPES:
-            raise HTTPException(422, "Jenis usaha tidak dikenal")
-        for k, v in body.model_dump(exclude_none=True).items():
-            store.put(s, k, str(v))
-        store.bump(s)
+        check_profile(body)
+        save_profile(s, body)
         s.commit()
         return get_settings(s)
 
     # ---- menu, ingredients, catalog
 
-    def menu_out(it: MenuItem) -> dict:
+    def suggested_price(cost: float, margin: float) -> int | None:
+        """Price that leaves `margin` of it after ingredients, rounded up to Rp500."""
+        if cost <= 0:
+            return None
+        return int(-(-cost / (1 - margin) // 500) * 500)
+
+    def menu_out(it: MenuItem, margin: float | None = None) -> dict:
         cost = analytics.unit_cost(it)
         return {"id": it.id, "name": it.name, "category": it.category, "price": it.price, "active": it.active,
                 "unit_cost": round(cost), "margin": round(1 - cost / it.price, 3) if it.price else None,
+                "suggested_price": suggested_price(cost, margin) if margin else None,
                 "recipe": [{"ingredient_id": r.ingredient_id, "name": r.ingredient.name, "unit": r.ingredient.unit,
                             "amount": r.amount} for r in it.recipe]}
 
     @app.get("/api/menu")
     def get_menu(all: bool = False, s: Session = Depends(authed)):
-        return [menu_out(it) for it in store.menu(s, active_only=not all)]
+        m = float(store.get(s, "target_margin") or 0.6)
+        return [menu_out(it, m) for it in store.menu(s, active_only=not all)]
 
     def save_menu(it: MenuItem, body: MenuIn, s: Session):
         if body.category not in CATEGORIES:
@@ -242,7 +294,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         store.bump(s)
         s.commit()
         s.refresh(it)
-        return menu_out(it)
+        return menu_out(it, float(store.get(s, "target_margin") or 0.6))
 
     @app.post("/api/menu", status_code=201)
     def add_menu(body: MenuIn, s: Session = Depends(authed)):
@@ -288,7 +340,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         return ingredient_out(g, store.stock_levels(s))
 
     @app.get("/api/catalog")
-    def catalog(business: str = "warung_makan", _: Session = Depends(authed)):
+    def catalog(business: str = "warung_makan"):  # public: the sign-up form shows it
         menu = MENUS.get(business, [])
         return {"items": [{"key": m.key, "name": m.name, "category": m.category, "price": m.price,
                            "recipe": [{"ingredient": INGREDIENTS[k].name, "unit": INGREDIENTS[k].unit, "amount": a}
@@ -296,10 +348,15 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.post("/api/catalog/apply")
     def catalog_apply(body: CatalogApplyIn, s: Session = Depends(authed)):
+        added = apply_catalog(s, body.items)
+        s.commit()
+        return {"added": added}
+
+    def apply_catalog(s: Session, keys: list[str]) -> int:
         all_items = {m.key: m for menu in MENUS.values() for m in menu}
         existing = {g.name: g for g in store.ingredients(s, active_only=False)}
         added = 0
-        for key in body.items:
+        for key in keys:
             m = all_items.get(key)
             if not m:
                 continue
@@ -318,8 +375,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
                 s.add(RecipeLine(item_id=it.id, ingredient_id=g.id, amount=amount))
             added += 1
         store.bump(s)
-        s.commit()
-        return {"added": added}
+        return added
 
     # ---- daily records
 
@@ -350,7 +406,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.get("/api/days")
     def get_days(start: date, end: date, s: Session = Depends(authed)):
-        return [{"day": d.isoformat(), "note": n} for d, n in sorted(store.closed_days(s, start, end).items())]
+        return [{"day": d.isoformat(), "note": n} for d, n in sorted(store.closed_days(s, start, end, include_off=False).items())]
 
     @app.put("/api/days/{day}")
     def put_day(day: date, body: ClosureIn, s: Session = Depends(authed)):
@@ -414,7 +470,59 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.get("/api/dashboard")
     def get_dashboard(days: int = 30, s: Session = Depends(authed)):
-        return analytics.dashboard(s, max(7, min(days, 365)))
+        out = analytics.dashboard(s, max(7, min(days, 365)))
+        out["target"] = summary.target(s, forecasts)
+        return out
+
+    @app.get("/api/summary")
+    def get_summary(s: Session = Depends(authed)):
+        return summary.week(s, forecasts)
+
+    @app.post("/api/simulate")
+    def simulate(body: SimulateIn, s: Session = Depends(authed)):
+        if body.sensitivity not in SENSITIVITY:
+            raise HTTPException(422, "Pilihan kepekaan harga tidak dikenal")
+        promo = None
+        if body.promo_start or body.promo_end:
+            if not (body.promo_start and body.promo_end) or body.promo_end < body.promo_start:
+                raise HTTPException(422, "Tanggal promo tidak valid")
+            promo = (body.promo_start, body.promo_end)
+        try:
+            return scenario(forecasts, s, body.item_id, body.new_price, promo, body.sensitivity)
+        except KeyError:
+            raise HTTPException(404, "Menu tidak ada atau tidak aktif")
+
+    # ---- expenses
+
+    def expense_out(e: Expense) -> dict:
+        return {"id": e.id, "day": e.day.isoformat(), "category": e.category, "amount": round(e.amount), "note": e.note}
+
+    @app.get("/api/expenses")
+    def get_expenses(start: date | None = None, end: date | None = None, s: Session = Depends(authed)):
+        end = end or store.today(s)
+        start = start or end - timedelta(days=30)
+        rows = s.scalars(select(Expense).where(Expense.day >= start, Expense.day <= end)
+                         .order_by(Expense.day.desc(), Expense.id.desc()))
+        return [expense_out(e) for e in rows]
+
+    @app.post("/api/expenses", status_code=201)
+    def add_expense(body: ExpenseIn, s: Session = Depends(authed)):
+        if body.category not in store.EXPENSE_CATEGORIES:
+            raise HTTPException(422, "Jenis pengeluaran tidak dikenal")
+        if body.day > store.today(s):
+            raise HTTPException(422, "Pengeluaran hanya bisa dicatat sampai hari ini")
+        e = Expense(**body.model_dump())
+        s.add(e)
+        s.commit()
+        return expense_out(e)
+
+    @app.delete("/api/expenses/{eid}")
+    def del_expense(eid: int, s: Session = Depends(authed)):
+        e = s.get(Expense, eid)
+        if e:
+            s.delete(e)
+            s.commit()
+        return {"ok": True}
 
     @app.get("/api/forecast")
     def get_forecast(s: Session = Depends(authed)):

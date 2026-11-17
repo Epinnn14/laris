@@ -8,11 +8,19 @@ Laris membantu warung makan dan kafe menjawab tiga pertanyaan harian:
 
 Semua angka dihitung di komputer atau server Anda sendiri. Tidak ada data yang dikirim ke pihak lain.
 
-## 1. Mulai
+## 1. Mulai: buat akun
 
-1. Buka Laris dan isi **nama usaha**, **jenis usaha** (warung makan atau kafe), dan **kata sandi**.
-2. Kalau ingin mencoba dulu, centang **"Isi dengan data contoh setahun"**. Data contoh bisa diganti kapan saja di Pengaturan.
-3. Kalau langsung memakai data sendiri, buka **Menu & resep** → **Tambah dari contoh menu**. Pilih menu yang mirip, lalu sesuaikan harga dan resepnya.
+Pertama kali dibuka, Laris menanyakan empat hal. Semuanya bisa diubah nanti di **Pengaturan**.
+
+1. **Tentang usaha:** nama usaha, nama pemilik, jenis usaha (warung makan atau kafe), lokasi (dekat kantor, kampus, perumahan, wisata, atau pasar), dan kota.
+2. **Cara berjualan:** hari buka, seberapa sering belanja bahan, target omzet per bulan, dan untung yang diinginkan dari harga jual.
+3. **Mulai dari mana:**
+   - **data contoh setahun** untuk mencoba semua halaman,
+   - **pilih menu dari contoh**, lengkap dengan resep dan bahan, tinggal sesuaikan harga,
+   - atau **mulai kosong**.
+4. **Kata sandi** (minimal 6 karakter), dipakai untuk masuk dari HP atau laptop lain.
+
+Tombol **EN/ID** dan **bulan/matahari** di pojok atas mengganti bahasa (Indonesia atau Inggris) dan tampilan (terang atau gelap).
 
 ## 2. Menu, resep, dan bahan
 
@@ -68,12 +76,64 @@ Laris menghitung berapa bahan yang terpakai sampai barang berikutnya datang, dib
 - **Salin untuk WhatsApp**: daftar siap dikirim ke pemasok atau ke orang yang belanja.
 - Tekan **Sudah dibeli** setelah belanja, supaya stok bertambah.
 
-## 7. Memakai dari HP
+## 7. Pengeluaran dan untung bersih
+
+Buka **Pengeluaran** untuk mencatat gas, listrik dan air, sewa, gaji, kemasan, serta bensin dan ongkir. Bahan tidak perlu dicatat di sini karena sudah tercatat di Stok.
+
+Beranda lalu menghitung seperti buku kas:
+
+| | |
+|---|---|
+| Uang masuk dari penjualan | |
+| − modal bahan untuk porsi yang terjual | dari resep |
+| − bahan terbuang | dari Stok |
+| − biaya lain | dari Pengeluaran |
+| **= untung bersih** | |
+
+Di bawahnya ada garis "dari setiap Rp100.000 yang masuk", supaya kelihatan berapa yang jadi bahan, biaya, dan untung.
+
+## 8. Target bulanan
+
+Kalau target omzet diisi, Beranda menunjukkan:
+
+- berapa yang sudah masuk,
+- perkiraan akhir bulan,
+- berapa yang perlu didapat per hari buka,
+- dan kemungkinan target tercapai (kecil, setengah-setengah, atau besar).
+
+## 9. Ringkasan minggu
+
+Halaman **Ringkasan minggu** merangkum 7 hari terakhir dalam kalimat biasa:
+
+- omzet dan untung dibanding minggu sebelumnya,
+- menu yang naik dan turun,
+- yang perlu diperhatikan (menu habis duluan, bahan terbuang, untung tipis, hari yang belum dicatat),
+- perkiraan minggu depan dan bahan yang paling mendesak dibeli.
+
+Tekan **Salin untuk WhatsApp** untuk mengirimnya ke keluarga atau rekan usaha.
+
+## 10. Coba hitung: kalau…
+
+Pilih satu menu, lalu coba:
+
+- **harga baru**, misalnya naik Rp1.000,
+- dan/atau **promo** di tanggal tertentu.
+
+Laris membandingkan 4 minggu ke depan "sekarang" dengan "kalau". Hasilnya berupa porsi menu itu, omzet seluruh menu, dan untung setelah modal bahan.
+
+- Efek promo dihitung oleh model.
+- Efek harga adalah perkiraan kasar dari pilihan **seberapa peka pembeli pada harga**, karena Laris belum pernah melihat harga di tokomu berubah.
+
+Tidak ada yang berubah sampai kamu sendiri mengubah harga di Menu.
+
+Di halaman **Menu & resep**, kolom **Saran harga** menunjukkan harga yang memberi untung sesuai target dari Pengaturan.
+
+## 11. Memakai dari HP
 
 Kalau Laris jalan di laptop toko, HP yang tersambung ke WiFi yang sama bisa membuka `http://<alamat-IP-laptop>:8000`.
 Kalau Laris dipasang online (lihat [DEPLOY.md](DEPLOY.md)), cukup buka alamatnya dari mana saja dan masuk dengan kata sandi.
 
-## 8. Data Anda
+## 12. Data Anda
 
 - **Pengaturan → Unduh semua penjualan (CSV)** bisa dibuka di Excel atau Google Sheets.
 - Di laptop, data tersimpan di volume Docker `laris-data`. Online, data tersimpan di database Postgres milik Anda.

@@ -9,8 +9,10 @@ A small food stall decides every evening how much chicken, rice and milk to buy 
 Buy too little and the best seller runs out at lunch. Buy too much and fresh ingredients spoil.
 Laris turns the daily sales the owner already writes down into answers to three questions:
 
-1. **How is the business doing?** Revenue, gross profit, best sellers with ABC classes and
-   margins, and which days were busy or quiet compared with the usual for that weekday.
+1. **How is the business doing?** A cash-book statement from sales down to net profit (ingredients
+   used, waste, and running costs such as gas, rent and wages), progress towards the monthly
+   target with the likely month end, which items earn the most, and which days were busy or quiet
+   compared with the usual for that weekday.
 2. **How much will each menu item sell in the next 4 weeks?** Probabilistic forecasts from a
    transformer trained for this setting. It knows weekdays, paydays, Ramadan, Lebaran,
    national holidays, promotions and planned closures.
@@ -20,11 +22,27 @@ Laris turns the daily sales the owner already writes down into answers to three 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-<p align="center"><img src="docs/screenshots/phone-catat.png" width="260" alt="Recording sales on a phone">
-<img src="docs/screenshots/phone-belanja.png" width="260" alt="Shopping list on a phone">
-<img src="docs/screenshots/phone-prediksi.png" width="260" alt="Forecast on a phone"></p>
+<p align="center"><img src="docs/screenshots/phone-catat.png" width="200" alt="Recording sales on a phone">
+<img src="docs/screenshots/phone-belanja.png" width="200" alt="Shopping list on a phone">
+<img src="docs/screenshots/phone-simulasi.png" width="200" alt="What-if on a phone">
+<img src="docs/screenshots/phone-ringkasan.png" width="200" alt="Weekly summary on a phone"></p>
 
-The app is in Indonesian and built for phones first. It runs on a laptop with one
+Also in the app:
+
+- **Sign-up wizard** that asks for the shop's name, owner, type, location, open days, shopping
+  habit, monthly target and wished margin, then starts from sample data, a sample menu, or empty.
+- **Expenses** (gas, electricity, rent, wages, packaging, fuel) so net profit is real.
+- **Weekly summary** in plain sentences: what rose, what fell, what needs attention, next week's
+  expected sales and most urgent purchases, copied to WhatsApp in one tap.
+- **What if:** a new price or a promotion for one item, compared with the current forecast for
+  the next 4 weeks. The promotion effect comes from the model; the price effect uses a rough
+  price sensitivity the owner picks, and the page says so.
+- **Price suggestions** from the recipe cost and the wished margin.
+- **Light and dark** display (follows the phone by default) and **Indonesian or English**.
+
+![Dashboard in dark mode, in English](docs/screenshots/dashboard-dark-en.png)
+
+The app is built for phones first. It runs on a laptop with one
 `docker compose up`, or online for free (Render + Neon). The model runs on CPU through
 onnxruntime, so it needs no GPU and no internet. Owners: see the [Indonesian guide](docs/PANDUAN.md).
 
@@ -173,8 +191,9 @@ python -m laris_ml.evaluate --model models/larisnet
 ```
 ml/laris_ml/        calendar_id (Indonesian calendar), synth (simulator), features, model, trainset,
                     train, evaluate, baselines, forecast (onnxruntime), plan (scenarios + shopping list)
-backend/laris_api/  FastAPI: auth, records, stock ledger, analytics, forecasts, demo data
-frontend/src/       React + TypeScript + Recharts, mobile-first, Indonesian
+backend/laris_api/  FastAPI: auth, records, stock ledger, expenses, analytics, weekly summary,
+                    forecasts and what-if, demo data
+frontend/src/       React + TypeScript + Recharts, mobile-first, Indonesian and English, light and dark
 models/larisnet/    model.onnx + meta.json + eval results (the app's model)
 notebooks/          training on Colab / Kaggle GPUs
 docs/               owner guide (ID), deployment (ID)
@@ -187,10 +206,13 @@ docs/               owner guide (ID), deployment (ID)
   CPU training as a smoke test.
 - **Model:** the committed model is evaluated against the baselines in CI, and the table is
   posted in the job summary.
-- **Backend:** API tests (auth, sales booking ingredients, stock counts, closures, demo,
-  forecasts, plan, CSV export) run on both SQLite and PostgreSQL.
-- **Web:** type-checked build, then a Playwright run at phone and desktop size against a demo
-  server. It opens every page, records a sale, buys stock, and fails on console errors, failed
-  API calls or sideways scrolling.
+- **Backend:** API tests (sign-up profile, auth, sales booking ingredients, stock counts,
+  closures and regular days off, expenses and net profit, demo, forecasts, plan, weekly summary,
+  monthly target, what-if, CSV export) run on both SQLite and PostgreSQL.
+- **Web:** every Indonesian text has an English entry (checked in the build), type-checked build,
+  then a Playwright run against a new shop: it goes through the sign-up wizard, opens every page
+  on a phone in light mode, on a desktop in dark mode and in English, records a sale, buys stock,
+  records and deletes an expense, runs a what-if, switches theme and language, and fails on
+  console errors, failed API calls, missing English texts or sideways scrolling.
 - **Docker:** the image is built and smoke-tested, checking that the model is loaded and the
   forecast comes from LarisNet.

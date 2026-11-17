@@ -1,4 +1,5 @@
 // Thin client for the Laris API. Session is an http-only cookie, so no token handling here.
+import { t } from "./i18n";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -14,11 +15,11 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     credentials: "same-origin",
   });
   if (!res.ok) {
-    let msg = `Terjadi kesalahan (${res.status})`;
+    let msg = t("Terjadi kesalahan ({n})", { n: res.status });
     try {
       const j = await res.json();
-      if (typeof j.detail === "string") msg = j.detail;
-      else if (Array.isArray(j.detail)) msg = "Isian belum lengkap atau tidak valid";
+      if (typeof j.detail === "string") msg = t(j.detail);
+      else if (Array.isArray(j.detail)) msg = t("Isian belum lengkap atau tidak valid");
     } catch {
       /* not json */
     }
@@ -43,6 +44,8 @@ export interface AppState {
   authed: boolean;
   demo_mode: boolean;
   shop_name: string;
+  owner_name: string;
+  language: "id" | "en";
   business: Business;
   today: string;
   model: { available: boolean; params?: number };
@@ -57,6 +60,12 @@ export interface DayPoint {
   recorded: boolean;
   level: "ramai" | "normal" | "sepi" | null;
   note: string;
+  usual: number;
+}
+
+export interface Target {
+  goal: number; done: number; month: string; days_left: number; open_days_left: number;
+  projected: number[] | null; complete: boolean; chance: number | null; per_day_needed: number;
 }
 
 export interface Dashboard {
@@ -64,7 +73,11 @@ export interface Dashboard {
   kpi: {
     revenue: number; revenue_change: number | null; profit: number; profit_change: number | null;
     portions: number; portions_change: number | null; avg_per_open_day: number; open_days: number; waste_cost: number;
+    ingredient_cost: number; expenses: number; net_profit: number; net_change: number | null;
+    best_day: { date: string; revenue: number } | null; quiet_day: { date: string; revenue: number } | null;
   };
+  expenses: { category: string; amount: number }[];
+  target: Target | null;
   series: DayPoint[];
   items: {
     id: number; name: string; category: Category; qty: number; revenue: number; profit: number;
@@ -108,7 +121,7 @@ export interface RecipeLine { ingredient_id: number; name?: string; unit?: strin
 
 export interface MenuItem {
   id: number; name: string; category: Category; price: number; active: boolean; unit_cost: number;
-  margin: number | null; recipe: RecipeLine[];
+  margin: number | null; suggested_price: number | null; recipe: RecipeLine[];
 }
 
 export interface Ingredient {
@@ -129,4 +142,30 @@ export interface StockMove {
   cost: number; note: string;
 }
 
-export interface Settings { shop_name: string; business: Business; cycle_days: string; service_level: string }
+export interface Settings {
+  shop_name: string; owner_name: string; business: Business; location: string; city: string; open_days: number[];
+  cycle_days: number; service_level: number; target_revenue: number; target_margin: number; language: "id" | "en";
+}
+
+export interface Expense { id: number; day: string; category: string; amount: number; note: string }
+
+export interface ItemMove { id: number; name: string; qty: number; before: number; change: number }
+export interface Summary {
+  start: string; end: string; missing: string[];
+  days: { date: string; revenue: number; closed: boolean; recorded: boolean }[];
+  revenue: number; revenue_change: number | null; portions: number; gross: number; net: number; net_before: number;
+  expenses: number; waste: number;
+  best_day: { date: string; revenue: number } | null; quiet_day: { date: string; revenue: number } | null;
+  risers: ItemMove[]; fallers: ItemMove[];
+  stockouts: { id: number; name: string; days: number }[];
+  low_margin: { id: number; name: string; margin: number }[];
+  next_week: { method: string; revenue: number[]; closed_days: number } | null;
+  buy: { name: string; cost: number; days_left: number | null }[];
+  target: Target | null;
+}
+
+export interface SimSide { revenue: number[]; gross: number[]; item_qty: number[]; item_revenue: number; item_gross: number }
+export interface Simulation {
+  days: number; item: { id: number; name: string; price: number; unit_cost: number }; new_price: number;
+  sensitivity: string; elasticity: number; method: string; promo_note: string | null; base: SimSide; what_if: SimSide;
+}

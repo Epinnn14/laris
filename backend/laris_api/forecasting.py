@@ -80,7 +80,8 @@ class Forecasts:
 
     # ------------------------------------------------------------------ inputs
 
-    def windows(self, s: Session, start: date, items: list[MenuItem]) -> tuple[list[F.Window], list[int], list[bool]]:
+    def windows(self, s: Session, start: date, items: list[MenuItem],
+                extra_promos: dict | None = None) -> tuple[list[F.Window], list[int], list[bool]]:
         business = store.get(s, "business")
         hist_start = start - timedelta(days=F.CONTEXT)
         hist_end = start - timedelta(days=1)
@@ -89,6 +90,7 @@ class Forecasts:
         closed = store.closed_days(s, hist_start, fut_end)
         recorded = store.recorded_days(s, hist_start, hist_end)
         promos = store.promo_days(s, hist_start, fut_end)
+        promos.update(extra_promos or {})
         past_dates = pd.date_range(hist_start, hist_end, freq="D")
         fut_dates = pd.date_range(start, fut_end, freq="D")
         past_cal, fut_cal = cal.table(past_dates), cal.table(fut_dates)
@@ -96,6 +98,7 @@ class Forecasts:
         weekly_off = {wd for wd in range(7)
                       if all((start - timedelta(days=k)) in closed
                              for k in range(1, 43) if (start - timedelta(days=k)).weekday() == wd)}
+        weekly_off |= store.off_weekdays(s)
         self.weekly_off = sorted(weekly_off)
         fut_closed = np.array([d.date() in closed or d.weekday() in weekly_off for d in fut_dates], dtype=np.float32)
         windows, n_hist = [], []
@@ -202,3 +205,62 @@ class Forecasts:
             return None
         return {"days": days_ago, "mae": round(float(err / n), 2), "accuracy": round(float(max(0.0, 1 - err / tot)), 3),
                 "method": res.method}
+
+
+# How much demand moves when the price moves (price elasticity). Laris has no price changes in its
+# training data, so these are rough, stated assumptions the owner picks, not something learned.
+SENSITIVITY = {"rendah": -0.6, "sedang": -1.2, "tinggi": -2.0}
+
+
+def scenario(fc: Forecasts, s: Session, item_id: int, new_price: int | None = None,
+             promo: tuple[date, date] | None = None, sensitivity: str = "sedang", days: int = F.HORIZON) -> dict:
+    """Compare the next `days` days as forecast now with a what-if: a new price for one item,
+    and/or a promotion on it. The promotion effect comes from the model; the price effect from
+    the chosen sensitivity."""
+    base = fc.compute(s)
+    ids = [x.item_id for x in base.items]
+    if item_id not in ids:
+        raise KeyError(item_id)
+    i = ids.index(item_id)
+    items = {it.id: it for it in store.menu(s)}
+    from .analytics import unit_cost
+    price = np.array([x.price for x in base.items], dtype=float)
+    cost = np.array([unit_cost(items[x]) for x in ids], dtype=float)
+    qs = np.stack([x.quantiles for x in base.items])
+    promo_note = None
+    if promo:
+        p0, p1 = promo
+        extra = {}
+        d = max(p0, base.start)
+        while d <= min(p1, base.dates[-1]):
+            extra[(item_id, d)] = True
+            d += timedelta(days=1)
+        if fc.model is not None and base.method == "larisnet" and base.items[i].history_days >= MIN_DAYS:
+            w, _, _ = fc.windows(s, base.start, [items[item_id]], extra_promos=extra)
+            qs = qs.copy()
+            qs[i] = fc.model.predict(w)[0]
+        else:
+            promo_note = "no_model"
+    paths = plan.sample_paths(qs, n=800, seed=base.start.toordinal())
+    new_p = price.copy()
+    if new_price is not None and new_price > 0 and price[i] > 0:
+        e = SENSITIVITY.get(sensitivity, -1.2)
+        paths = paths.copy()
+        paths[:, i, :] *= (new_price / price[i]) ** e
+        new_p[i] = new_price
+    n = min(days, F.HORIZON)
+
+    def summarize(pp, pr):
+        rev = (pp[..., :n] * pr[None, :, None]).sum(axis=(1, 2))
+        gross = (pp[..., :n] * (pr - cost)[None, :, None]).sum(axis=(1, 2))
+        qty = pp[:, i, :n].sum(axis=1)
+        q = lambda a: [round(float(np.quantile(a, x))) for x in (0.1, 0.5, 0.9)]
+        return {"revenue": q(rev), "gross": q(gross), "item_qty": q(qty),
+                "item_revenue": round(float(np.median(qty)) * pr[i]),
+                "item_gross": round(float(np.median(qty)) * (pr[i] - cost[i]))}
+
+    return {"days": n, "item": {"id": item_id, "name": base.items[i].name, "price": int(price[i]),
+                                "unit_cost": round(float(cost[i]))},
+            "new_price": int(new_p[i]), "sensitivity": sensitivity, "elasticity": SENSITIVITY.get(sensitivity, -1.2),
+            "method": base.method, "promo_note": promo_note,
+            "base": summarize(base.paths, price), "what_if": summarize(paths, new_p)}
