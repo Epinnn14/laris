@@ -160,9 +160,9 @@ function ToDo({ d, plan, today }: { d: Dashboard; plan: Plan | null; today: stri
     text: t("{name} habis duluan {n}× bulan ini. Siapkan lebih banyak.", { name: so[0].name, n: so[0].stockouts }) });
   if (d.kpi.expenses === 0) items.push({ urgent: false, href: "#/pengeluaran", action: t("Catat"),
     text: t("Belum ada biaya lain tercatat, jadi untung bersih terlihat lebih besar dari kenyataan.") });
-  const thin = d.items.filter((x) => x.margin !== null && x.margin < 0.4);
+  const thin = d.items.filter((x) => x.margin !== null && x.margin < d.target_margin);
   if (thin.length) items.push({ urgent: false, href: "#/menu", action: t("Cek harga"),
-    text: t("{n} menu untungnya tipis (di bawah 40%): {names}", { n: thin.length, names: thin.slice(0, 2).map((x) => x.name).join(", ") + (thin.length > 2 ? ", …" : "") }) });
+    text: t("{n} menu untungnya di bawah target {p}: {names}", { n: thin.length, p: pct(d.target_margin), names: thin.slice(0, 2).map((x) => x.name).join(", ") + (thin.length > 2 ? ", …" : "") }) });
 
   return (
     <section className="card" aria-labelledby="todo-h">
@@ -296,6 +296,7 @@ function DailyChart({ d }: { d: Dashboard }) {
 // ---------------------------------------------------------------- which menu earns
 
 function MenuEarnings({ d }: { d: Dashboard }) {
+  const goal = d.target_margin;
   const [all, setAll] = useState(false);
   const items = [...d.items].sort((a, b) => b.profit - a.profit);
   const max = Math.max(1, ...items.map((x) => x.profit));
@@ -323,7 +324,7 @@ function MenuEarnings({ d }: { d: Dashboard }) {
                 <span className="num">{t("{n} porsi terjual", { n: num(x.qty) })}</span>
                 <span className="num">{t("untung {p} per porsi", { p: pct(x.margin) })}</span>
                 {x.change !== null && <span className={`num ${x.change >= 0 ? "up" : "down"}`}>{x.change >= 0 ? "▲" : "▼"} {pct(Math.abs(x.change))}</span>}
-                {x.margin !== null && x.margin < 0.4 && <span className="badge warn">{t("untung tipis")}</span>}
+                {x.margin !== null && x.margin < goal && <span className="badge warn">{t("di bawah target untung")}</span>}
                 {x.stockouts > 0 && <span className="badge bad">{t("habis duluan {n}×", { n: x.stockouts })}</span>}
               </div>
             </div>

@@ -6,7 +6,7 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -40,6 +40,19 @@ class Database:
     def create(self) -> None:
         from . import models  # noqa: F401  (registers the tables)
         Base.metadata.create_all(self.engine)
+        self._add_missing_columns()
+
+    # columns added after the first release; create_all() does not touch existing tables
+    NEW_COLUMNS = {"menu_items": {"batch_cost": "FLOAT", "batch_qty": "FLOAT"}}
+
+    def _add_missing_columns(self) -> None:
+        insp = inspect(self.engine)
+        for table, cols in self.NEW_COLUMNS.items():
+            have = {c["name"] for c in insp.get_columns(table)}
+            with self.engine.begin() as conn:
+                for name, kind in cols.items():
+                    if name not in have:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {kind}"))
 
     def session(self) -> Iterator[Session]:
         with self.Session() as s:

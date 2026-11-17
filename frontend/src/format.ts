@@ -69,9 +69,11 @@ export const addDays = (s: string, n: number) => { const d = parseDay(s); d.setD
 
 export const catLabel = (c: Category) => t(({
   makanan: "Makanan", camilan: "Camilan", minuman_dingin: "Minuman dingin", minuman_panas: "Minuman panas",
+  sembako: "Sembako", kebutuhan_rumah: "Kebutuhan rumah",
 } as Record<Category, string>)[c]);
+export const CATEGORIES: Category[] = ["makanan", "camilan", "minuman_dingin", "minuman_panas", "sembako", "kebutuhan_rumah"];
 
-export const businessLabel = (b: string) => t(b === "kafe" ? "Kafe" : "Warung makan");
+export const businessLabel = (b: string) => t(b === "kafe" ? "Kafe" : b === "kios" ? "Kios / toko kelontong" : "Warung makan");
 
 export const LOCATIONS = ["kantor", "kampus", "perumahan", "wisata", "pasar", "lainnya"] as const;
 export const locationLabel = (l: string) => t(({

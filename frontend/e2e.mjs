@@ -30,9 +30,11 @@ const pages = {
 
 const browser = await chromium.launch();
 
-async function open(label, opts, lang) {
+async function open(label, opts, lang, theme = "light") {
   const ctx = await browser.newContext(opts);
-  await ctx.addInitScript((l) => { try { localStorage.setItem("laris-lang", l); } catch { /* ignore */ } }, lang);
+  await ctx.addInitScript(([l, th]) => {
+    try { localStorage.setItem("laris-lang", l); if (!sessionStorage.getItem("set")) { localStorage.setItem("laris-theme", th); sessionStorage.setItem("set", "1"); } } catch { /* ignore */ }
+  }, [lang, theme]);
   const page = await ctx.newPage();
   page.on("pageerror", (e) => problems.push(`${label}: page error ${e}`));
   page.on("console", (m) => {
@@ -51,7 +53,6 @@ async function signUp(page) {
   await page.fill("#shop", "Warung Uji Laba");
   await page.fill("#owner", "Pak Uji");
   await page.getByRole("button", { name: /Kafe/ }).click();
-  await page.getByRole("button", { name: "Dekat pasar" }).click();
   await page.fill("#city", "Solo");
   await page.getByRole("button", { name: "Lanjut" }).click();
   await page.getByRole("button", { name: "Minggu", exact: true }).click();   // closed on Sundays
@@ -98,7 +99,7 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
 
 // 1. phone, light, Indonesian: sign up, then every page
 {
-  const page = await open("phone-light", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: "light" }, "id");
+  const page = await open("phone-light", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, "id");
   await signIn(page);
   await tour(page, "phone-light", 0);
   await page.close();
@@ -106,7 +107,8 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
 
 // 2. desktop, dark, Indonesian: every page plus the actions
 {
-  const page = await open("desktop-dark", { viewport: { width: 1360, height: 900 }, colorScheme: "dark" }, "id");
+  const page = await open("desktop-dark", { viewport: { width: 1360, height: 900 } }, "id", "dark");
+  expect(await page.evaluate(() => document.documentElement.dataset.theme) === "dark", "dark theme not applied");
   await signIn(page);
   await tour(page, "desktop-dark", 0);
 
@@ -133,6 +135,20 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
   await page.waitForTimeout(800);
   expect(await page.getByRole("row", { name: /Rp123\.456/ }).count() === 0, "deleted expense still listed");
 
+  // a menu item costed the simple way: money spent and portions it makes
+  await page.goto(`${base}/#/menu`);
+  await page.getByRole("button", { name: "Menu baru" }).click();
+  await page.fill("#mn", "Nasi Uduk Uji");
+  await page.fill("#mp", "10000");
+  await page.fill("#bc", "120000");
+  await page.fill("#bq", "30");
+  await page.getByRole("dialog").getByText("Rp4.000", { exact: false }).first().waitFor({ timeout: 5000 }).catch(() => problems.push("simple cost not shown"));
+  await page.getByRole("dialog").getByRole("button", { name: "Simpan" }).click();
+  await page.getByRole("row", { name: /Nasi Uduk Uji/ }).waitFor({ timeout: 10000 }).catch(() => problems.push("new menu item not listed"));
+
+  await page.goto(`${base}/#/ringkasan`);
+  await page.getByRole("heading", { name: "Saran penjualan minggu depan" }).waitFor({ timeout: 15000 }).catch(() => problems.push("weekly summary has no sales tips"));
+
   await page.goto(`${base}/#/simulasi`);
   await page.getByRole("button", { name: "Hitung", exact: true }).click();
   await page.getByRole("heading", { name: /Hasil untuk/ }).waitFor({ timeout: 20000 }).catch(() => problems.push("what-if showed no result"));
@@ -149,7 +165,7 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
 
 // 3. desktop, light, English: every page
 {
-  const page = await open("desktop-en", { viewport: { width: 1360, height: 900 }, colorScheme: "light" }, "en");
+  const page = await open("desktop-en", { viewport: { width: 1360, height: 900 } }, "en");
   await signIn(page);
   await tour(page, "desktop-en", 1);
   await page.goto(`${base}/#/simulasi`);

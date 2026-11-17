@@ -25,6 +25,10 @@ class MenuItem(Base):
     price: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort: Mapped[int] = mapped_column(Integer, default=0)
+    # simple cost: "I spend batch_cost and it makes batch_qty portions ready to sell".
+    # When set it is the item's cost; the recipe then only moves stock.
+    batch_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    batch_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     recipe: Mapped[list["RecipeLine"]] = relationship(back_populates="item", cascade="all, delete-orphan")
 

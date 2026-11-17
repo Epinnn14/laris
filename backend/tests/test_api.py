@@ -149,3 +149,58 @@ def test_what_if_price_and_promo(owner):
     assert pr["promo_note"] is None and pr["what_if"]["item_qty"][1] > pr["base"]["item_qty"][1]
     assert owner.post("/api/simulate", json={"item_id": 99999}).status_code == 404
     assert owner.post("/api/simulate", json={"item_id": item["id"], "sensitivity": "x"}).status_code == 422
+
+
+def test_kios_with_sample_goods(client):
+    assert client.post("/api/setup", json={"shop_name": "Toko Maju", "business": "kios", "password": "rahasia1",
+                                           "start": "demo"}).status_code == 422
+    r = client.post("/api/setup", json={"shop_name": "Toko Maju", "business": "kios", "password": "rahasia1",
+                                        "start": "catalog", "catalog_items": ["k_mi", "k_air", "k_gas"]})
+    assert r.status_code == 200
+    menu = {m["name"]: m for m in client.get("/api/menu").json()}
+    mi = menu["Mi instan"]
+    assert mi["category"] == "sembako" and mi["unit_cost"] == round(116_000 / 40)
+    ings = {g["name"]: g for g in client.get("/api/ingredients").json()}
+    assert ings["Mi instan"]["unit"] == "pcs" and ings["Mi instan"]["pack_size"] == 40
+    # selling takes the goods off the shelf
+    client.post("/api/stock", json={"ingredient_id": ings["Mi instan"]["id"], "kind": "beli", "qty": 40, "cost": 116000})
+    client.put("/api/sales/2026-11-16", json={"entries": [{"item_id": mi["id"], "qty": 7}]})
+    assert {g["name"]: g["on_hand"] for g in client.get("/api/ingredients").json()}["Mi instan"] == 33
+    assert client.get("/api/forecast").status_code == 200  # read by the model as the closest pattern
+    assert client.post("/api/demo", json={"business": "kios"}).status_code == 422
+
+
+def test_simple_cost_per_batch(owner):
+    r = owner.post("/api/menu", json={"name": "Nasi Uduk", "category": "makanan", "price": 10000,
+                                      "batch_cost": 120000, "batch_qty": 30})
+    m = r.json()
+    assert r.status_code == 201 and m["unit_cost"] == 4000 and m["margin"] == 0.6 and m["batch_qty"] == 30
+    # clearing the batch falls back to the recipe (none here)
+    m = owner.put(f"/api/menu/{m['id']}", json={"name": "Nasi Uduk", "category": "makanan", "price": 10000}).json()
+    assert m["unit_cost"] == 0 and m["batch_cost"] is None
+
+
+def test_old_database_gets_new_columns(tmp_path):
+    import sqlite3
+    from laris_api.db import Database
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE menu_items (id INTEGER PRIMARY KEY, name VARCHAR(120), category VARCHAR(32), "
+                "price INTEGER, active BOOLEAN, sort INTEGER, created DATETIME)")
+    con.execute("INSERT INTO menu_items VALUES (1, 'Es Teh', 'minuman_dingin', 5000, 1, 0, '2026-01-01')")
+    con.commit()
+    con.close()
+    Database(f"sqlite:///{db}").create()
+    cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(menu_items)")}
+    assert {"batch_cost", "batch_qty"} <= cols
+
+
+def test_summary_suggestions(owner):
+    owner.put("/api/settings", json={"target_margin": 0.8})
+    owner.post("/api/demo", json={"business": "warung_makan"})
+    owner.put("/api/settings", json={"target_margin": 0.8})
+    w = owner.get("/api/summary").json()
+    assert len(w["top"]) == 3 and w["top"][0]["revenue"] >= w["top"][1]["revenue"]
+    assert w["weekdays"]["busiest_revenue"] >= w["weekdays"]["quietest_revenue"] and w["weekdays"]["busiest"] != 6
+    assert w["target_margin"] == 0.8 and w["low_margin"]
+    assert all(x["margin"] < 0.8 and x["suggested_price"] % 500 == 0 for x in w["low_margin"])

@@ -21,7 +21,7 @@ export default function Lainnya({ prefs }: { prefs: Prefs }) {
         </div>
       </nav>
       <p className="small muted" style={{ marginTop: 16 }}>
-        {t("Tampilan: {th} · Bahasa: {l}", { th: prefs.theme === "dark" ? t("Gelap") : prefs.theme === "light" ? t("Terang") : t("Ikuti HP"), l: prefs.lang === "en" ? "English" : "Bahasa Indonesia" })}
+        {t("Tampilan: {th} · Bahasa: {l}", { th: prefs.theme === "dark" ? t("Gelap") : t("Terang"), l: prefs.lang === "en" ? "English" : "Bahasa Indonesia" })}
       </p>
     </>
   );

@@ -83,6 +83,7 @@ class Forecasts:
     def windows(self, s: Session, start: date, items: list[MenuItem],
                 extra_promos: dict | None = None) -> tuple[list[F.Window], list[int], list[bool]]:
         business = store.get(s, "business")
+        business = store.MODEL_BUSINESS.get(business, business)
         hist_start = start - timedelta(days=F.CONTEXT)
         hist_end = start - timedelta(days=1)
         fut_end = start + timedelta(days=F.HORIZON - 1)
@@ -125,7 +126,8 @@ class Forecasts:
             pr = np.array([bool((sales.get((it.id, past_dates[k].date())) and sales[(it.id, past_dates[k].date())].promo)
                                 or promos.get((it.id, past_dates[k].date()))) for k in run], dtype=np.float32)
             fpr = np.array([promos.get((it.id, d.date()), False) for d in fut_dates], dtype=np.float32)
-            windows.append(F.build(qty, cl, so, pr, past_cal[run], fut_cal, fut_closed, fpr, it.category, business))
+            cat = store.MODEL_CATEGORY.get(it.category, it.category)
+            windows.append(F.build(qty, cl, so, pr, past_cal[run], fut_cal, fut_closed, fpr, cat, business))
             n_hist.append(len(run))
         return windows, n_hist, [bool(x) for x in fut_closed]
 

@@ -1,7 +1,7 @@
 // The week in plain sentences, ready to send to a partner or family on WhatsApp.
 import type { AppState, Summary } from "../api";
 import { t, useLang } from "../i18n";
-import { dayShort, dayWithName, monthName, pct, rupiah, rupiahShort, weekdayShort } from "../format";
+import { dayShort, dayWithName, monthName, num, pct, rupiah, rupiahShort, weekdayName, weekdayShort } from "../format";
 import { ErrorBox, Icon, Loading, PageHead, toast, useApi } from "../ui";
 
 function changeWords(x: number | null): string {
@@ -18,9 +18,35 @@ function sentences(w: Summary) {
   if (w.missing.length) attention.push(t("{n} hari belum dicatat: {days}.", { n: w.missing.length, days: w.missing.map(dayWithName).join(", ") }));
   for (const s of w.stockouts.slice(0, 3)) attention.push(t("{name} habis duluan {n} hari. Siapkan lebih banyak.", { name: s.name, n: s.days }));
   if (w.waste > 0) attention.push(t("Bahan terbuang senilai {rp}.", { rp: rupiah(w.waste) }));
-  for (const m of w.low_margin.slice(0, 2)) attention.push(t("{name} untungnya tipis ({p} dari harga). Pertimbangkan naik harga.", { name: m.name, p: pct(m.margin) }));
+  for (const m of w.low_margin.slice(0, 2)) attention.push(t("{name} untungnya {p}, di bawah target {goal}.", { name: m.name, p: pct(m.margin), goal: pct(w.target_margin) }));
   if (w.expenses === 0) attention.push(t("Belum ada pengeluaran tercatat minggu ini."));
   return { headline, attention };
+}
+
+type Tip = { text: string; href?: string; action?: string };
+
+/** Concrete things to try next week, from what the week showed. */
+function suggestions(w: Summary): Tip[] {
+  const tips: Tip[] = [];
+  const r = w.risers[0], f = w.fallers[0], top = w.top[0];
+  if (r) tips.push({ text: t("{name} sedang naik {p}. Siapkan lebih banyak dan tawarkan duluan ke pembeli.", { name: r.name, p: pct(r.change) }),
+                     href: "#/prediksi", action: t("Lihat prediksi") });
+  if (f) tips.push({ text: top && top.name !== f.name
+      ? t("{name} turun {p}. Coba promo kecil atau paket bersama {top}.", { name: f.name, p: pct(-f.change), top: top.name })
+      : t("{name} turun {p}. Coba promo kecil atau paket hemat.", { name: f.name, p: pct(-f.change) }),
+    href: "#/simulasi", action: t("Coba hitung") });
+  if (w.weekdays) {
+    tips.push({ text: t("{day} biasanya paling ramai (sekitar {rp}). Siapkan bahan sehari sebelumnya.", { day: weekdayName(w.weekdays.busiest), rp: rupiahShort(w.weekdays.busiest_revenue) }),
+                href: "#/belanja", action: t("Daftar belanja") });
+    tips.push({ text: t("{day} paling sepi (sekitar {rp}). Cocok untuk promo atau paket hemat.", { day: weekdayName(w.weekdays.quietest), rp: rupiahShort(w.weekdays.quietest_revenue) }),
+                href: "#/simulasi", action: t("Coba hitung") });
+  }
+  const m = w.low_margin.find((x) => x.suggested_price > x.price);
+  if (m) tips.push({ text: t("Naikkan harga {name} dari {a} ke sekitar {b} supaya untungnya {p}.", { name: m.name, a: rupiah(m.price), b: rupiah(m.suggested_price), p: pct(w.target_margin) }),
+                     href: "#/simulasi", action: t("Coba hitung") });
+  if (top) tips.push({ text: t("{name} paling banyak menghasilkan uang minggu ini. Jaga stoknya jangan sampai habis.", { name: top.name }),
+                       href: "#/stok", action: t("Cek stok") });
+  return tips.slice(0, 5);
 }
 
 export default function Ringkasan({ state }: { state: AppState }) {
@@ -30,6 +56,7 @@ export default function Ringkasan({ state }: { state: AppState }) {
   if (!s.data) return <Loading label={t("Menyusun ringkasan…")} />;
   const w = s.data;
   const { headline, attention } = sentences(w);
+  const tips = suggestions(w);
   const max = Math.max(1, ...w.days.map((d) => d.revenue));
 
   const copy = async () => {
@@ -40,6 +67,7 @@ export default function Ringkasan({ state }: { state: AppState }) {
       ...(w.risers.length ? [t("Naik: {list}.", { list: w.risers.map((r) => `${r.name} +${pct(r.change)}`).join(", ") })] : []),
       ...(w.fallers.length ? [t("Turun: {list}.", { list: w.fallers.map((r) => `${r.name} −${pct(-r.change)}`).join(", ") })] : []),
       ...attention,
+      ...(tips.length ? [t("Saran:"), ...tips.map((x) => `- ${x.text}`)] : []),
       ...(w.next_week ? [t("Minggu depan diperkirakan {lo} – {hi}.", { lo: rupiahShort(w.next_week.revenue[0]), hi: rupiahShort(w.next_week.revenue[2]) })] : []),
     ];
     try { await navigator.clipboard.writeText(lines.join("\n")); toast(t("Ringkasan disalin, tinggal tempel di WhatsApp")); }
@@ -72,6 +100,26 @@ export default function Ringkasan({ state }: { state: AppState }) {
               <Moves title={t("Yang naik")} items={w.risers} up />
               <Moves title={t("Yang turun")} items={w.fallers} />
             </div>
+            {w.top.length > 0 && (
+              <div>
+                <h3 style={{ marginBottom: 4 }}>{t("Paling laku minggu ini")}</h3>
+                <table className="ledger" style={{ fontSize: 15 }}><tbody>
+                  {w.top.map((x, i) => <tr key={x.id}><td>{i + 1}. {x.name}<span className="note">{t("{n} porsi terjual · untung {rp}", { n: num(x.qty), rp: rupiahShort(x.profit) })}</span></td>
+                    <td>{rupiah(x.revenue)}</td></tr>)}
+                </tbody></table>
+              </div>
+            )}
+            {tips.length > 0 && (
+              <div>
+                <h3 style={{ marginBottom: 2 }}>{t("Saran penjualan minggu depan")}</h3>
+                <ul className="todo">
+                  {tips.map((x, i) => (
+                    <li key={x.text}><span className="n">{i + 1}</span><span className="grow">{x.text}</span>
+                      {x.href && <a className="btn small" href={x.href}>{x.action}</a>}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 
@@ -102,7 +150,7 @@ export default function Ringkasan({ state }: { state: AppState }) {
                 </div>
               )}
               {w.target && (
-                <p className="small">{t("Target {month}: sudah {done} dari {goal}.", { month: monthName(w.target.month), done: rupiahShort(w.target.done), goal: rupiahShort(w.target.goal) })}
+                <p className="small">{w.target.done >= w.target.goal ? t("Target {month} sudah tercapai: {done} dari {goal}.", { month: monthName(w.target.month), done: rupiahShort(w.target.done), goal: rupiahShort(w.target.goal) }) : t("Target {month}: sudah {done} dari {goal}.", { month: monthName(w.target.month), done: rupiahShort(w.target.done), goal: rupiahShort(w.target.goal) })}
                   {w.target.done < w.target.goal && ` ${t("Perlu rata-rata {rp} per hari buka.", { rp: rupiahShort(w.target.per_day_needed) })}`}</p>
               )}
             </div>

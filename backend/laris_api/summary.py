@@ -14,7 +14,6 @@ from . import analytics, store
 
 MIN_QTY = 10       # an item needs this many portions in a week before its change is worth mentioning
 MOVE = 0.15        # a change of 15% or more is called a rise or a fall
-LOW_MARGIN = 0.4
 
 
 def _pct(now: float, before: float) -> float | None:
@@ -50,10 +49,27 @@ def week(s: Session, forecasts) -> dict:
     fallers = sorted([m for m in moves if m["change"] < 0], key=lambda m: m["change"])[:3]
     stockouts = sorted([{"id": iid, "name": items[iid]["name"], "days": v["stockouts"]}
                         for iid, v in cur["by_item"].items() if v["stockouts"]], key=lambda x: -x["days"])
-    low_margin = sorted([{"id": iid, "name": it["name"], "margin": round(1 - it["cost"] / it["price"], 3)}
+    goal_margin = float(store.get(s, "target_margin") or 0.6)
+    low_margin = sorted([{"id": iid, "name": it["name"], "margin": round(1 - it["cost"] / it["price"], 3),
+                          "price": it["price"], "suggested_price": int(-(-it["cost"] / (1 - goal_margin) // 500) * 500)}
                          for iid, it in items.items()
-                         if it["active"] and it["price"] and it["cost"] and 1 - it["cost"] / it["price"] < LOW_MARGIN],
+                         if it["active"] and it["price"] and it["cost"] and 1 - it["cost"] / it["price"] < goal_margin],
                         key=lambda x: x["margin"])
+    top = sorted([{"id": iid, "name": items[iid]["name"], "qty": v["qty"], "revenue": round(v["revenue"]),
+                   "profit": round(v["revenue"] - v["cost"])} for iid, v in cur["by_item"].items() if v["qty"]],
+                 key=lambda x: -x["revenue"])[:3]
+    # usual sales per weekday over the last 8 weeks, open days only
+    hist = analytics._period(s, end - timedelta(days=55), end, items)
+    by_wd: dict[int, list[float]] = {}
+    for d, v in hist["by_day"].items():
+        if d not in hist["closed"] and v["revenue"] > 0:
+            by_wd.setdefault(d.weekday(), []).append(v["revenue"])
+    wd_avg = {k: float(np.mean(v)) for k, v in by_wd.items() if len(v) >= 3}
+    weekdays = None
+    if len(wd_avg) >= 2:
+        hi, lo = max(wd_avg, key=wd_avg.get), min(wd_avg, key=wd_avg.get)
+        weekdays = {"busiest": hi, "busiest_revenue": round(wd_avg[hi]), "quietest": lo,
+                    "quietest_revenue": round(wd_avg[lo])}
 
     nxt = None
     buy = []
@@ -75,6 +91,7 @@ def week(s: Session, forecasts) -> dict:
         "best_day": max(open_days, key=lambda x: x["revenue"], default=None),
         "quiet_day": min(open_days, key=lambda x: x["revenue"], default=None),
         "risers": risers, "fallers": fallers, "stockouts": stockouts, "low_margin": low_margin,
+        "target_margin": goal_margin, "top": top, "weekdays": weekdays,
         "next_week": nxt, "buy": buy, "target": target(s, forecasts),
     }
 

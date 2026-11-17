@@ -47,19 +47,6 @@
 }
 
 /* Night lamp: the same book under a warm lamp, not a "tech" dark theme. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #17130f; --sheet: #201b16; --ink: #f1e8da; --ink-2: #d9ccba; --muted: #b4a693;
-    --rule: #3a3128; --rule-strong: #54483b; --hover: #2b241d;
-    --accent: #e8835a; --accent-hover: #f09872; --accent-ink: #1b120c; --accent-soft: #42271a;
-    --gain: #86cfa0; --gain-soft: #1f3327; --loss: #f29484; --loss-soft: #3d1f1a;
-    --warn: #e6bb63; --warn-soft: #3a2d14; --info-soft: #1d2a34; --info: #a9c8e0;
-    --chart-ink: #cbb9a2; --chart-faint: #4a3f34; --chart-band: #5a3424;
-    --input: #1a1612; --focus: rgba(232, 131, 90, 0.55); --overlay: rgba(0, 0, 0, 0.6);
-    --float: 0 10px 30px rgba(0, 0, 0, 0.5);
-    color-scheme: dark;
-  }
-}
 :root[data-theme="dark"] {
   --paper: #17130f; --sheet: #201b16; --ink: #f1e8da; --ink-2: #d9ccba; --muted: #b4a693;
   --rule: #3a3128; --rule-strong: #54483b; --hover: #2b241d;

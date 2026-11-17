@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, type Category } from "../api";
 import { t } from "../i18n";
-import { businessLabel, catLabel, locationLabel, rupiah, weekdayAbbr } from "../format";
+import { businessLabel, catLabel, rupiah, weekdayAbbr } from "../format";
 import { QuickPrefs, type Prefs } from "../prefs";
 import { EMPTY_PROFILE, HabitFields, ShopFields, type ProfileValue } from "../profile";
 import { ErrorBox, Icon, Loading, useApi } from "../ui";
@@ -70,6 +70,9 @@ function SignUp({ lang, onDone }: { lang: string; onDone: () => void }) {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a kios has no sample year of sales; a different business has a different sample menu
+  useEffect(() => { if (p.business === "kios" && start === "demo") setStart("catalog"); }, [p.business, start]);
+  useEffect(() => { setPicked(new Set()); }, [p.business]);
 
   const valid = [
     p.shop_name.trim().length > 0,
@@ -107,7 +110,7 @@ function SignUp({ lang, onDone }: { lang: string; onDone: () => void }) {
           <p className="muted" style={{ marginTop: 6 }}>{[
             t("Isi sekali saja. Semua bisa diubah nanti di Pengaturan."),
             t("Supaya prediksi dan daftar belanja cocok dengan kebiasaanmu."),
-            t("Kamu bisa mencoba dulu dengan data contoh, lalu menggantinya dengan data sendiri."),
+            p.business === "kios" ? t("Pilih barang yang kamu jual dari contoh, atau isi sendiri dari awal.") : t("Kamu bisa mencoba dulu dengan data contoh, lalu menggantinya dengan data sendiri."),
             t("Dipakai untuk masuk dari HP atau laptop lain."),
           ][step]}</p>
         </div>
@@ -149,8 +152,9 @@ function StartChoice({ business, start, setStart, picked, setPicked }: {
 }) {
   const cat = useApi<{ items: CatalogItem[] }>(start === "catalog" ? `/catalog?business=${business}` : null, [business, start]);
   const options: { v: Start; title: string; text: string }[] = [
-    { v: "demo", title: t("Coba dengan data contoh"), text: t("Setahun penjualan toko contoh, supaya semua halaman langsung terisi. Bisa dihapus nanti.") },
-    { v: "catalog", title: t("Pilih menu dari contoh"), text: t("Menu, resep, dan bahan sudah terisi. Tinggal sesuaikan harga.") },
+    ...(business === "kios" ? [] : [{ v: "demo" as Start, title: t("Coba dengan data contoh"), text: t("Setahun penjualan toko contoh, supaya semua halaman langsung terisi. Bisa dihapus nanti.") }]),
+    { v: "catalog", title: business === "kios" ? t("Pilih barang dari contoh") : t("Pilih menu dari contoh"),
+      text: business === "kios" ? t("Barang, harga beli, dan isi per dus sudah terisi. Tinggal sesuaikan harga.") : t("Menu, resep, dan bahan sudah terisi. Tinggal sesuaikan harga.") },
     { v: "empty", title: t("Mulai kosong"), text: t("Isi menu dan resep sendiri dari awal.") },
   ];
   const toggle = (k: string) => { const n = new Set(picked); if (n.has(k)) n.delete(k); else n.add(k); setPicked(n); };
@@ -165,7 +169,7 @@ function StartChoice({ business, start, setStart, picked, setPicked }: {
       </div>
       {start === "catalog" && (
         <div className="field">
-          <span className="label">{t("Menu yang kamu jual")}</span>
+          <span className="label">{business === "kios" ? t("Barang yang kamu jual") : t("Menu yang kamu jual")}</span>
           {cat.error && <ErrorBox message={cat.error} retry={cat.reload} />}
           {!cat.data ? <Loading /> : (
             <div className="stack" style={{ gap: 0 }}>
@@ -190,7 +194,7 @@ function StartChoice({ business, start, setStart, picked, setPicked }: {
 function Review({ p, start, picked }: { p: ProfileValue; start: Start; picked: number }) {
   const rows: [string, string][] = [
     [t("Usaha"), `${p.shop_name} · ${businessLabel(p.business)}`],
-    [t("Lokasi"), [locationLabel(p.location), p.city].filter(Boolean).join(", ")],
+    ...(p.city ? [[t("Kota"), p.city] as [string, string]] : []),
     [t("Hari buka"), p.open_days.length === 7 ? t("Setiap hari") : p.open_days.map(weekdayAbbr).join(", ")],
     [t("Target omzet"), p.target_revenue ? t("{rp} per bulan", { rp: rupiah(p.target_revenue) }) : t("Belum ada")],
     [t("Mulai dengan"), start === "demo" ? t("Data contoh") : start === "catalog" ? t("{n} menu contoh", { n: picked }) : t("Kosong")],

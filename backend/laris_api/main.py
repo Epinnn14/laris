@@ -20,9 +20,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from laris_ml import features as F
-from laris_ml.catalog import BUSINESS_TYPES, CATEGORIES, INGREDIENTS, MENUS
+from laris_ml.catalog import INGREDIENTS, MENUS
 
-from . import analytics, auth, demo, store, summary
+from . import analytics, auth, demo, kios, store, summary
 from .db import Database
 from .forecasting import SENSITIVITY, Forecasts, scenario
 from .models import DailySale, DayStatus, Expense, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
@@ -89,6 +89,8 @@ class MenuIn(BaseModel):
     price: int = Field(ge=0)
     active: bool = True
     recipe: list[RecipeIn] = []
+    batch_cost: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    batch_qty: float | None = Field(default=None, gt=0, le=100_000)
 
 
 class IngredientIn(BaseModel):
@@ -204,8 +206,10 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         if store.get(s, "password"):
             raise HTTPException(409, "Toko sudah dibuat. Silakan masuk.")
         check_profile(body)
-        store.put(s, "password", auth.hash_password(body.password))
         start = "demo" if body.demo else body.start
+        if start == "demo" and body.business not in demo.LOCATION:
+            raise HTTPException(422, "Data contoh hanya ada untuk warung makan dan kafe")
+        store.put(s, "password", auth.hash_password(body.password))
         if start == "demo":
             demo.load(s, body.business)
         save_profile(s, body)
@@ -229,7 +233,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         return {"ok": True}
 
     def check_profile(body: Profile) -> None:
-        if body.business is not None and body.business not in BUSINESS_TYPES:
+        if body.business is not None and body.business not in store.BUSINESSES:
             raise HTTPException(422, "Jenis usaha tidak dikenal")
         if body.location is not None and body.location not in store.LOCATIONS:
             raise HTTPException(422, "Lokasi tidak dikenal")
@@ -270,6 +274,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         cost = analytics.unit_cost(it)
         return {"id": it.id, "name": it.name, "category": it.category, "price": it.price, "active": it.active,
                 "unit_cost": round(cost), "margin": round(1 - cost / it.price, 3) if it.price else None,
+                "recipe_cost": round(analytics.recipe_cost(it)), "batch_cost": it.batch_cost, "batch_qty": it.batch_qty,
                 "suggested_price": suggested_price(cost, margin) if margin else None,
                 "recipe": [{"ingredient_id": r.ingredient_id, "name": r.ingredient.name, "unit": r.ingredient.unit,
                             "amount": r.amount} for r in it.recipe]}
@@ -280,9 +285,11 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         return [menu_out(it, m) for it in store.menu(s, active_only=not all)]
 
     def save_menu(it: MenuItem, body: MenuIn, s: Session):
-        if body.category not in CATEGORIES:
+        if body.category not in store.CATEGORIES:
             raise HTTPException(422, "Kategori tidak dikenal")
         it.name, it.category, it.price, it.active = body.name, body.category, body.price, body.active
+        simple = body.batch_cost is not None and body.batch_qty
+        it.batch_cost, it.batch_qty = (body.batch_cost, body.batch_qty) if simple else (None, None)
         it.recipe.clear()
         s.flush()
         seen = set()
@@ -341,6 +348,9 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.get("/api/catalog")
     def catalog(business: str = "warung_makan"):  # public: the sign-up form shows it
+        if business == "kios":
+            return {"items": [{"key": g.key, "name": g.name, "category": g.category, "price": g.price,
+                               "recipe": [{"ingredient": g.name, "unit": "pcs", "amount": 1}]} for g in kios.GOODS]}
         menu = MENUS.get(business, [])
         return {"items": [{"key": m.key, "name": m.name, "category": m.category, "price": m.price,
                            "recipe": [{"ingredient": INGREDIENTS[k].name, "unit": INGREDIENTS[k].unit, "amount": a}
@@ -357,6 +367,22 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         existing = {g.name: g for g in store.ingredients(s, active_only=False)}
         added = 0
         for key in keys:
+            g = kios.BY_KEY.get(key)
+            if g:  # a good is its own stock: one sold takes one off the shelf
+                it = MenuItem(name=g.name, category=g.category, price=g.price)
+                s.add(it)
+                ing = existing.get(g.name)
+                if not ing:
+                    ing = Ingredient(name=g.name, unit="pcs", cost_per_unit=g.pack_price / g.pack,
+                                     shelf_life_days=g.shelf_life_days, lead_time_days=g.lead_time_days,
+                                     pack_size=g.pack, pack_name=g.pack_name)
+                    s.add(ing)
+                    s.flush()
+                    existing[g.name] = ing
+                s.flush()
+                s.add(RecipeLine(item_id=it.id, ingredient_id=ing.id, amount=1))
+                added += 1
+                continue
             m = all_items.get(key)
             if not m:
                 continue
@@ -472,6 +498,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
     def get_dashboard(days: int = 30, s: Session = Depends(authed)):
         out = analytics.dashboard(s, max(7, min(days, 365)))
         out["target"] = summary.target(s, forecasts)
+        out["target_margin"] = float(store.get(s, "target_margin") or 0.6)
         return out
 
     @app.get("/api/summary")
@@ -566,8 +593,8 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.post("/api/demo")
     def load_demo(body: DemoIn, s: Session = Depends(authed)):
-        if body.business not in BUSINESS_TYPES:
-            raise HTTPException(422, "Jenis usaha tidak dikenal")
+        if body.business not in demo.LOCATION:
+            raise HTTPException(422, "Data contoh hanya ada untuk warung makan dan kafe")
         return demo.load(s, body.business)
 
     @app.get("/api/export/sales.csv")

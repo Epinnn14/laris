@@ -28,6 +28,13 @@ DEFAULTS = {
     "language": "id",
 }
 
+# The model was trained on warung makan and kafe with four categories. A kios / toko kelontong
+# and its extra categories are read by the model as the closest pattern it knows.
+BUSINESSES = ("warung_makan", "kafe", "kios")
+CATEGORIES = ("makanan", "camilan", "minuman_dingin", "minuman_panas", "sembako", "kebutuhan_rumah")
+MODEL_BUSINESS = {"kios": "warung_makan"}
+MODEL_CATEGORY = {"sembako": "makanan", "kebutuhan_rumah": "camilan"}
+
 EXPENSE_CATEGORIES = ("gas", "listrik_air", "sewa", "gaji", "kemasan", "transport", "lainnya")
 LOCATIONS = ("kantor", "kampus", "perumahan", "wisata", "pasar", "lainnya")
 

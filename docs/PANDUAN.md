@@ -12,20 +12,26 @@ Semua angka dihitung di komputer atau server Anda sendiri. Tidak ada data yang d
 
 Pertama kali dibuka, Laris menanyakan empat hal. Semuanya bisa diubah nanti di **Pengaturan**.
 
-1. **Tentang usaha:** nama usaha, nama pemilik, jenis usaha (warung makan atau kafe), lokasi (dekat kantor, kampus, perumahan, wisata, atau pasar), dan kota.
+1. **Tentang usaha:** nama usaha, nama pemilik, jenis usaha (warung makan, kafe, atau kios / toko kelontong), dan kota.
 2. **Cara berjualan:** hari buka, seberapa sering belanja bahan, target omzet per bulan, dan untung yang diinginkan dari harga jual.
 3. **Mulai dari mana:**
-   - **data contoh setahun** untuk mencoba semua halaman,
+   - **data contoh setahun** untuk mencoba semua halaman (khusus warung makan dan kafe),
    - **pilih menu dari contoh**, lengkap dengan resep dan bahan, tinggal sesuaikan harga,
    - atau **mulai kosong**.
 4. **Kata sandi** (minimal 6 karakter), dipakai untuk masuk dari HP atau laptop lain.
 
-Tombol **EN/ID** dan **bulan/matahari** di pojok atas mengganti bahasa (Indonesia atau Inggris) dan tampilan (terang atau gelap).
+Tombol **EN/ID** dan **bulan/matahari** di pojok atas mengganti bahasa (Indonesia atau Inggris) dan tampilan (terang atau gelap). Tampilan awalnya terang.
 
-## 2. Menu, resep, dan bahan
+Untuk kios / toko kelontong, setiap barang adalah stoknya sendiri: satu terjual berarti satu berkurang dari rak. Model prediksi dilatih dengan pola warung dan kafe, jadi untuk kios ia memakai pola warung makan.
+
+## 2. Menu, modal, dan bahan
+
+Cara paling mudah mengisi modal: isi **uang belanja** dan **jadi berapa porsi siap jual**. Contoh: belanja Rp120.000 untuk satu panci soto, jadi 30 porsi, berarti modalnya Rp4.000 per porsi. Untuk barang jadi di kios, isi harga satu dus dan isinya.
+
+Kalau ingin stok bahan berkurang otomatis dan muncul di daftar belanja, buka **Hubungkan ke stok bahan (opsional)** lalu isi bahan per porsi:
 
 - **Resep per porsi** artinya berapa gram, ml, atau buah bahan untuk satu porsi. Contoh: Nasi Goreng = beras 150 g, ayam 50 g, telur 1 buah.
-- Dari resep, Laris menghitung **modal bahan per porsi** dan **margin**. Menu dengan margin di bawah 40% ditandai kuning.
+- Menu yang untungnya di bawah target dari Pengaturan (20%, 40%, 50%, 60%, atau 80%) ditandai kuning, dan kolom **Saran harga** menunjukkan harga yang sesuai target.
 - Setiap bahan punya isian berikut:
   - **Isi dan harga satu kemasan**, misalnya karung 5 kg seharga Rp70.000.
   - **Tahan berapa hari**. Ayam segar 2 hari, beras 180 hari.
@@ -107,7 +113,9 @@ Halaman **Ringkasan minggu** merangkum 7 hari terakhir dalam kalimat biasa:
 
 - omzet dan untung dibanding minggu sebelumnya,
 - menu yang naik dan turun,
-- yang perlu diperhatikan (menu habis duluan, bahan terbuang, untung tipis, hari yang belum dicatat),
+- menu paling laku,
+- yang perlu diperhatikan (menu habis duluan, bahan terbuang, untung di bawah target, hari yang belum dicatat),
+- saran penjualan minggu depan (menu yang sedang naik, yang perlu promo, hari paling ramai dan paling sepi, harga yang perlu dinaikkan),
 - perkiraan minggu depan dan bahan yang paling mendesak dibeli.
 
 Tekan **Salin untuk WhatsApp** untuk mengirimnya ke keluarga atau rekan usaha.

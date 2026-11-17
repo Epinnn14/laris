@@ -82,13 +82,6 @@ export default function App() {
     window.addEventListener("laris:unauthorized", on);
     return () => window.removeEventListener("laris:unauthorized", on);
   }, [refresh]);
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const on = () => applyTheme("system");
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, [theme]);
 
   if (failed) return (
     <LangProvider lang={lang}><div className="center"><div className="card pad stack" style={{ maxWidth: 420 }}>
@@ -106,7 +99,7 @@ export default function App() {
     switch (route) {
       case "catat": return <Catat today={state.today} initialDay={new URLSearchParams(query).get("hari")} />;
       case "stok": return <Stok today={state.today} />;
-      case "prediksi": return <Prediksi />;
+      case "prediksi": return <Prediksi business={state.business} />;
       case "belanja": return <Belanja today={state.today} />;
       case "menu": return <Menu business={state.business} />;
       case "pengaturan": return <Pengaturan state={state} prefs={prefs} onChange={refresh} />;

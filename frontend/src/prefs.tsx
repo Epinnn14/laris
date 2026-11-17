@@ -6,7 +6,7 @@ export interface Prefs { lang: Lang; theme: Theme; setLang: (l: Lang) => void; s
 
 /** Theme and language, one tap away on every page. */
 export function QuickPrefs({ prefs, compact }: { prefs: Prefs; compact?: boolean }) {
-  const dark = prefs.theme === "dark" || (prefs.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark = prefs.theme === "dark";
   return (
     <div className="row">
       <button className="btn ghost small" onClick={() => prefs.setLang(prefs.lang === "id" ? "en" : "id")}

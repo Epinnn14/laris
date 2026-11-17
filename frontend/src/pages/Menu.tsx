@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { api, type Business, type Category, type Ingredient, type MenuItem, type Settings } from "../api";
-import { amount, catLabel, pct, rupiah, unitLabel } from "../format";
+import { amount, CATEGORIES, catLabel, dec, pct, rupiah, unitLabel } from "../format";
+import { RupiahField } from "../profile";
 import { t, useLang } from "../i18n";
 
-const CATS: Category[] = ["makanan", "camilan", "minuman_dingin", "minuman_panas"];
 const suggest = (cost: number, margin: number) => (cost > 0 ? Math.ceil(cost / (1 - margin) / 500) * 500 : null);
 import { Dialog, ErrorBox, Loading, PageHead, Segmented, toast, useApi } from "../ui";
 
@@ -45,10 +45,10 @@ export default function Menu({ business }: { business: Business }) {
                 <tbody>{menu.data.map((m) => (
                   <tr key={m.id} style={{ opacity: m.active ? 1 : 0.55 }}>
                     <td><strong>{m.name}</strong><div className="small muted">{catLabel(m.category)}{!m.active && ` · ${t("tidak dijual")}`}
-                      {m.recipe.length === 0 && <span className="badge warn" style={{ marginLeft: 6 }}>{t("belum ada resep")}</span>}</div></td>
+                      {m.unit_cost === 0 && <span className="badge warn" style={{ marginLeft: 6 }}>{t("modal belum diisi")}</span>}</div></td>
                     <td className="num">{rupiah(m.price)}</td>
                     <td className="num">{rupiah(m.unit_cost)}</td>
-                    <td className="num"><span className={`badge ${m.margin !== null && m.margin < 0.4 ? "warn" : "good"}`}>{pct(m.margin)}</span></td>
+                    <td className="num"><span className={`badge ${m.margin !== null && m.margin < margin ? "warn" : "good"}`}>{pct(m.margin)}</span></td>
                     <td className="num">{(() => { const sp = suggest(m.unit_cost, margin); return sp === null ? "–" : sp > m.price
                       ? <span title={t("Harga sekarang di bawah target untung")}><strong>{rupiah(sp)}</strong> <span className="badge warn">{t("naikkan")}</span></span>
                       : <span className="muted">{t("sudah pas")}</span>; })()}</td>
@@ -93,14 +93,21 @@ function ItemDialog({ item, ings, margin, onClose, onDone }: { item: MenuItem | 
   const [category, setCategory] = useState<Category>(item?.category ?? "makanan");
   const [price, setPrice] = useState(String(item?.price ?? ""));
   const [active, setActive] = useState(item?.active ?? true);
+  const [batchCost, setBatchCost] = useState(item?.batch_cost ?? 0);
+  const [batchQty, setBatchQty] = useState(item?.batch_qty ? String(item.batch_qty) : "");
   const [recipe, setRecipe] = useState(item?.recipe.map((r) => ({ ingredient_id: r.ingredient_id, amount: String(r.amount) })) ?? []);
   const [busy, setBusy] = useState(false);
   const byId = new Map(ings.map((g) => [g.id, g]));
-  const cost = recipe.reduce((a, r) => a + (byId.get(r.ingredient_id)?.cost_per_unit ?? 0) * (parseFloat(r.amount.replace(",", ".")) || 0), 0);
+  const recipeCost = recipe.reduce((a, r) => a + (byId.get(r.ingredient_id)?.cost_per_unit ?? 0) * (parseFloat(r.amount.replace(",", ".")) || 0), 0);
+  const qty = parseFloat(batchQty.replace(",", ".")) || 0;
+  const simple = batchCost > 0 && qty > 0;
+  const cost = simple ? batchCost / qty : recipeCost;
+  const p = Number(price || 0);
 
   const save = async () => {
     setBusy(true);
-    const body = { name, category, price: Number(price || 0), active,
+    const body = { name, category, price: p, active,
+      batch_cost: simple ? batchCost : null, batch_qty: simple ? qty : null,
       recipe: recipe.filter((r) => r.ingredient_id && parseFloat(r.amount.replace(",", ".")) > 0)
         .map((r) => ({ ingredient_id: r.ingredient_id, amount: parseFloat(r.amount.replace(",", ".")) })) };
     try {
@@ -119,22 +126,52 @@ function ItemDialog({ item, ings, margin, onClose, onDone }: { item: MenuItem | 
       <div className="grid halves" style={{ gap: 10 }}>
         <div className="field"><label htmlFor="mc">{t("Kategori")}</label>
           <select id="mc" className="input" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-            {CATS.map((k) => <option key={k} value={k}>{catLabel(k)}</option>)}</select></div>
+            {CATEGORIES.map((k) => <option key={k} value={k}>{catLabel(k)}</option>)}</select></div>
         <div className="field"><label htmlFor="mp">{t("Harga jual (Rp)")}</label>
           <input id="mp" className="input" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, ""))} /></div>
       </div>
-      <div className="field">
-        <span className="label">{t("Resep per porsi")}</span>
+
+      <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend className="label" style={{ marginBottom: 6, padding: 0 }}>{t("Modal")}</legend>
+        <div className="grid halves" style={{ gap: 10 }}>
+          <RupiahField id="bc" label={t("Uang belanja")} value={batchCost} onChange={setBatchCost} />
+          <div className="field">
+            <label htmlFor="bq">{t("Jadi berapa porsi siap jual?")}</label>
+            <input id="bq" className="input" inputMode="decimal" value={batchQty} onChange={(e) => setBatchQty(e.target.value.replace(/[^\d.,]/g, ""))} />
+          </div>
+        </div>
+        <span className="hint">{t("Contoh: belanja Rp120.000 untuk satu panci soto, jadi 30 porsi. Untuk barang jadi: harga satu dus dan isinya.")}</span>
+      </fieldset>
+
+      <table className="ledger" style={{ fontSize: 15 }}>
+        <tbody>
+          <tr><td>{t("Modal per porsi")}<span className="note">{simple ? t("{rp} ÷ {n} porsi", { rp: rupiah(batchCost), n: dec(qty) })
+            : recipe.length ? t("dihitung dari bahan di bawah") : t("isi uang belanja dan jumlah porsi")}</span></td>
+            <td>{cost > 0 ? rupiah(cost) : "–"}</td></tr>
+          {p > 0 && cost > 0 && <tr><td>{t("Untung per porsi")}</td>
+            <td><span className={1 - cost / p < margin ? "down" : "up"}>{rupiah(p - cost)} ({pct(1 - cost / p)})</span></td></tr>}
+        </tbody>
+      </table>
+      {suggest(cost, margin) !== null && (
+        <div className="row wrap small">
+          <span>{t("Saran harga untuk untung {p}: {rp}", { p: pct(margin), rp: rupiah(suggest(cost, margin)!) })}</span>
+          {String(suggest(cost, margin)) !== price && <button type="button" className="btn small" onClick={() => setPrice(String(suggest(cost, margin)))}>{t("Pakai harga ini")}</button>}
+        </div>
+      )}
+
+      <details className="field">
+        <summary className="label" style={{ minHeight: 40, paddingTop: 10 }}>{t("Hubungkan ke stok bahan (opsional)")}</summary>
+        <span className="hint" style={{ marginBottom: 6 }}>{t("Kalau diisi, stok bahan berkurang otomatis saat penjualan dicatat, dan bahan ini masuk daftar belanja.")}</span>
         {recipe.map((r, i) => {
           const g = byId.get(r.ingredient_id);
           return (
-            <div key={i} className="row">
+            <div key={i} className="row" style={{ marginBottom: 6 }}>
               <select className="input grow" value={r.ingredient_id || ""} aria-label={t("Bahan")}
                       onChange={(e) => setRecipe(recipe.map((x, j) => (j === i ? { ...x, ingredient_id: Number(e.target.value) } : x)))}>
                 <option value="">{t("Pilih bahan…")}</option>
                 {ings.filter((g2) => g2.active).map((g2) => <option key={g2.id} value={g2.id}>{g2.name}</option>)}
               </select>
-              <input className="input" style={{ width: 90 }} inputMode="decimal" value={r.amount} aria-label={t("Jumlah")}
+              <input className="input" style={{ width: 84 }} inputMode="decimal" value={r.amount} aria-label={t("Jumlah")}
                      onChange={(e) => setRecipe(recipe.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
               <span className="small muted" style={{ width: 44 }}>{g ? unitLabel(g.unit) : ""}</span>
               <button className="btn small ghost" onClick={() => setRecipe(recipe.filter((_, j) => j !== i))} aria-label={t("Hapus bahan")}>✕</button>
@@ -142,14 +179,8 @@ function ItemDialog({ item, ings, margin, onClose, onDone }: { item: MenuItem | 
           );
         })}
         <button className="btn small" style={{ alignSelf: "flex-start" }} onClick={() => setRecipe([...recipe, { ingredient_id: 0, amount: "" }])}>{t("+ Bahan")}</button>
-        <span className="hint">{t("Modal bahan per porsi ≈ {rp}", { rp: rupiah(cost) })}{Number(price) > 0 && ` · ${t("untung {p} per porsi", { p: pct(1 - cost / Number(price)) })}`}</span>
-        {suggest(cost, margin) !== null && (
-          <div className="row wrap small">
-            <span>{t("Saran harga untuk untung {p}: {rp}", { p: pct(margin), rp: rupiah(suggest(cost, margin)!) })}</span>
-            {String(suggest(cost, margin)) !== price && <button type="button" className="btn small" onClick={() => setPrice(String(suggest(cost, margin)))}>{t("Pakai harga ini")}</button>}
-          </div>
-        )}
-      </div>
+        {simple && recipe.length > 0 && <span className="hint">{t("Modal tetap memakai uang belanja di atas. Bahan di sini hanya untuk stok.")}</span>}
+      </details>
       <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{t("Masih dijual")}</label>
     </Dialog>
   );
@@ -221,7 +252,7 @@ function CatalogDialog({ business, onClose, onDone }: { business: Business; onCl
     <Dialog title={t("Tambah dari contoh menu")} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{t("Batal")}</button>
       <button className="btn primary" onClick={save} disabled={busy || picked.size === 0}>{t("Tambah {n} menu", { n: picked.size || "" })}</button></>}>
-      <Segmented label={t("Jenis usaha")} value={biz} onChange={setBiz} options={[{ value: "warung_makan", label: t("Warung makan") }, { value: "kafe", label: t("Kafe") }]} />
+      <Segmented label={t("Jenis usaha")} value={biz} onChange={setBiz} options={[{ value: "warung_makan", label: t("Warung makan") }, { value: "kafe", label: t("Kafe") }, { value: "kios", label: t("Kios") }]} />
       <span className="small muted">{t("Harga dan resep bisa diubah setelah ditambahkan. Bahan yang dibutuhkan ikut dibuat.")}</span>
       {!cat.data ? <Loading /> : cat.data.items.map((it) => (
         <label key={it.key} className="check" style={{ alignItems: "flex-start" }}>

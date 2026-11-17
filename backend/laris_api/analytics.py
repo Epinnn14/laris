@@ -15,8 +15,15 @@ from .models import Expense, StockMove
 DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 
 
-def unit_cost(item) -> float:
+def recipe_cost(item) -> float:
     return sum(r.amount * r.ingredient.cost_per_unit for r in item.recipe)
+
+
+def unit_cost(item) -> float:
+    """What one portion costs: the owner's own batch figure if given, else the recipe."""
+    if item.batch_cost and item.batch_qty:
+        return item.batch_cost / item.batch_qty
+    return recipe_cost(item)
 
 
 def _period(s: Session, start: date, end: date, items: dict) -> dict:

@@ -5,7 +5,7 @@ import { addDays, catLabel, dayShort, dayWithName, num, pct, rupiah, rupiahShort
 import { t, useLang } from "../i18n";
 import { ErrorBox, Loading, PageHead, Segmented, toast, useApi } from "../ui";
 
-export default function Prediksi() {
+export default function Prediksi({ business }: { business: string }) {
   useLang();
   const fc = useApi<Forecast>("/forecast");
   const [metric, setMetric] = useState<"revenue" | "portions">("revenue");
@@ -29,6 +29,7 @@ export default function Prediksi() {
       <PageHead title={t("Prediksi 4 minggu")} sub={<>
         {f.method === "larisnet" ? t("Dari model LarisNet: pola hari, gajian, Ramadan dan Lebaran, libur, promo, dan hari tutup.") : t(f.note)}
         {f.method === "larisnet" && f.note && <> {t(f.note)}</>}
+        {business === "kios" && <> {t("Model dilatih dengan pola warung dan kafe, jadi untuk kios ia memakai pola warung makan. Ketepatannya terlihat di kotak biru setelah 4 minggu tercatat.")}</>}
       </>}>
         <Segmented label={t("Tampilkan")} value={metric} onChange={setMetric}
                    options={[{ value: "revenue", label: t("Omzet") }, { value: "portions", label: t("Porsi") }]} />

@@ -29,16 +29,22 @@ Laris turns the daily sales the owner already writes down into answers to three 
 
 Also in the app:
 
-- **Sign-up wizard** that asks for the shop's name, owner, type, location, open days, shopping
-  habit, monthly target and wished margin, then starts from sample data, a sample menu, or empty.
+- **Sign-up wizard** that asks for the shop's name, owner, type (warung makan, café, or kios /
+  toko kelontong), open days, shopping habit, monthly target and wished margin, then starts from
+  sample data, a sample menu or sample goods, or empty.
+- **Simple costing:** "I spend Rp120,000 and it makes 30 portions" sets the cost per portion;
+  linking ingredients is optional and only needed for automatic stock.
 - **Expenses** (gas, electricity, rent, wages, packaging, fuel) so net profit is real.
-- **Weekly summary** in plain sentences: what rose, what fell, what needs attention, next week's
-  expected sales and most urgent purchases, copied to WhatsApp in one tap.
+- **Weekly summary** in plain sentences: what rose, what fell, best sellers, what needs attention,
+  sales tips for next week, expected sales and most urgent purchases, copied to WhatsApp in one tap.
 - **What if:** a new price or a promotion for one item, compared with the current forecast for
   the next 4 weeks. The promotion effect comes from the model; the price effect uses a rough
   price sensitivity the owner picks, and the page says so.
 - **Price suggestions** from the recipe cost and the wished margin.
-- **Light and dark** display (follows the phone by default) and **Indonesian or English**.
+- **Light and dark** display and **Indonesian or English**.
+- **Kios / toko kelontong:** each good is its own stock. The model has only seen warung and café
+  patterns, so a kios is forecast with the warung pattern; the in-app backtest shows how well that
+  fits after four weeks.
 
 ![Dashboard in dark mode, in English](docs/screenshots/dashboard-dark-en.png)
 

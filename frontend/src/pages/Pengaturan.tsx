@@ -57,7 +57,7 @@ export default function Pengaturan({ state, prefs, onChange }: { state: AppState
           <div className="field">
             <span className="label">{t("Tampilan")}</span>
             <Segmented label={t("Tampilan")} value={prefs.theme} onChange={prefs.setTheme}
-                       options={[{ value: "system", label: t("Ikuti HP") }, { value: "light", label: t("Terang") }, { value: "dark", label: t("Gelap") }]} />
+                       options={[{ value: "light", label: t("Terang") }, { value: "dark", label: t("Gelap") }]} />
             <span className="hint">{t("Tampilan gelap lebih nyaman di malam hari. Pilihan ini berlaku untuk perangkat ini saja.")}</span>
           </div>
           <div className="field">

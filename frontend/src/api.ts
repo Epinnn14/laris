@@ -36,8 +36,8 @@ export const api = {
   del: <T>(p: string) => call<T>("DELETE", p),
 };
 
-export type Category = "makanan" | "camilan" | "minuman_dingin" | "minuman_panas";
-export type Business = "warung_makan" | "kafe";
+export type Category = "makanan" | "camilan" | "minuman_dingin" | "minuman_panas" | "sembako" | "kebutuhan_rumah";
+export type Business = "warung_makan" | "kafe" | "kios";
 
 export interface AppState {
   setup_needed: boolean;
@@ -78,6 +78,7 @@ export interface Dashboard {
   };
   expenses: { category: string; amount: number }[];
   target: Target | null;
+  target_margin: number;
   series: DayPoint[];
   items: {
     id: number; name: string; category: Category; price: number; qty: number; revenue: number; profit: number;
@@ -122,6 +123,7 @@ export interface RecipeLine { ingredient_id: number; name?: string; unit?: strin
 export interface MenuItem {
   id: number; name: string; category: Category; price: number; active: boolean; unit_cost: number;
   margin: number | null; suggested_price: number | null; recipe: RecipeLine[];
+  recipe_cost: number; batch_cost: number | null; batch_qty: number | null;
 }
 
 export interface Ingredient {
@@ -158,7 +160,10 @@ export interface Summary {
   best_day: { date: string; revenue: number } | null; quiet_day: { date: string; revenue: number } | null;
   risers: ItemMove[]; fallers: ItemMove[];
   stockouts: { id: number; name: string; days: number }[];
-  low_margin: { id: number; name: string; margin: number }[];
+  low_margin: { id: number; name: string; margin: number; price: number; suggested_price: number }[];
+  target_margin: number;
+  top: { id: number; name: string; qty: number; revenue: number; profit: number }[];
+  weekdays: { busiest: number; busiest_revenue: number; quietest: number; quietest_revenue: number } | null;
   next_week: { method: string; revenue: number[]; closed_days: number } | null;
   buy: { name: string; cost: number; days_left: number | null }[];
   target: Target | null;

@@ -1,7 +1,7 @@
 // The shop profile, asked once at sign-up and editable in Settings.
 import type { Business } from "./api";
 import { t } from "./i18n";
-import { LOCATIONS, locationLabel, num, parseRupiah, weekdayAbbr, weekdayName } from "./format";
+import { num, parseRupiah, weekdayAbbr, weekdayName } from "./format";
 import { Segmented } from "./ui";
 
 export interface ProfileValue {
@@ -10,7 +10,7 @@ export interface ProfileValue {
 }
 
 export const EMPTY_PROFILE: ProfileValue = {
-  shop_name: "", owner_name: "", business: "warung_makan", location: "kantor", city: "",
+  shop_name: "", owner_name: "", business: "warung_makan", location: "lainnya", city: "",
   open_days: [0, 1, 2, 3, 4, 5, 6], cycle_days: 1, target_revenue: 0, target_margin: 0.6,
 };
 
@@ -39,18 +39,10 @@ export function ShopFields({ v, set }: { v: ProfileValue; set: Set }) {
           <button type="button" className="tile" aria-pressed={v.business === "kafe"} onClick={() => set({ business: "kafe" })}>
             <strong>{t("Kafe / kedai kopi")}</strong><span>{t("Kopi, minuman dingin, camilan")}</span>
           </button>
+          <button type="button" className="tile" aria-pressed={v.business === "kios"} onClick={() => set({ business: "kios" })}>
+            <strong>{t("Kios / toko kelontong")}</strong><span>{t("Sembako, mi instan, minuman, sabun, gas")}</span>
+          </button>
         </div>
-      </div>
-      <div className="field">
-        <span className="label" id="loc-l">{t("Lokasi usaha")}</span>
-        <div className="chips" role="group" aria-labelledby="loc-l">
-          {LOCATIONS.map((l) => (
-            <button type="button" key={l} className="chip" aria-pressed={v.location === l} onClick={() => set({ location: l })}>
-              {locationLabel(l)}
-            </button>
-          ))}
-        </div>
-        <span className="hint">{t("Pembeli dekat kantor sepi di akhir pekan, di perumahan justru ramai. Ini membantu prediksi.")}</span>
       </div>
       <div className="field">
         <label htmlFor="city">{t("Kota")} <span className="muted">({t("boleh dikosongkan")})</span></label>
@@ -90,8 +82,8 @@ export function HabitFields({ v, set }: { v: ProfileValue; set: Set }) {
       <div className="field">
         <span className="label" id="mg-l">{t("Untung yang diinginkan dari harga jual")}</span>
         <Segmented label={t("Untung yang diinginkan dari harga jual")} value={v.target_margin} onChange={(m) => set({ target_margin: m })}
-                   options={[0.5, 0.6, 0.7].map((m) => ({ value: m, label: `${Math.round(m * 100)}%` }))} />
-        <span className="hint">{t("Contoh 60%: dari harga Rp10.000, modal bahan paling banyak Rp4.000. Dipakai untuk saran harga di Menu.")}</span>
+                   options={[0.2, 0.4, 0.5, 0.6, 0.8].map((m) => ({ value: m, label: `${Math.round(m * 100)}%` }))} />
+        <span className="hint">{t("Contoh 60%: dari harga Rp10.000, modal paling banyak Rp4.000. Toko kelontong biasanya 10–20%, warung makan 50–60%. Dipakai untuk saran harga di Menu.")}</span>
       </div>
     </>
   );
