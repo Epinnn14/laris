@@ -132,6 +132,7 @@ def main(argv: list[str] | None = None) -> None:
     md = markdown(res)
     print(md)
     out = Path(a.out or a.model)
+    out.mkdir(parents=True, exist_ok=True)
     (out / "eval.json").write_text(json.dumps(res, indent=2))
     (out / "eval.md").write_text(md)
 
