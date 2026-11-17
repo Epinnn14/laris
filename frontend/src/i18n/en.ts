@@ -499,6 +499,8 @@ export const EN: Record<string, string> = {
   "{n} menu ditambahkan": "{n} items added",
   "{n} menu untungnya tipis (di bawah 40%): {names}": "Thin profit, under 40% ({n}): {names}",
   "{n} porsi": "{n} portions",
+  "{n} porsi terjual": "{n} sold",
+  "harga {rp}": "price {rp}",
   "{rp} per bulan": "{rp} per month",
   "{rp} per {u}": "{rp} per {u}",
   "{s} dari {p}": "{s} vs {p}",

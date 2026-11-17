@@ -80,7 +80,7 @@ export interface Dashboard {
   target: Target | null;
   series: DayPoint[];
   items: {
-    id: number; name: string; category: Category; qty: number; revenue: number; profit: number;
+    id: number; name: string; category: Category; price: number; qty: number; revenue: number; profit: number;
     margin: number | null; change: number | null; stockouts: number; abc: "A" | "B" | "C";
   }[];
   weekday: { day: string; revenue: number }[];

@@ -121,7 +121,7 @@ def dashboard(s: Session, days: int = 30) -> dict:
     for iid, v in cur["by_item"].items():
         it = items[iid]
         pv = prev["by_item"].get(iid, {"qty": 0})
-        top.append({"id": iid, "name": it["name"], "category": it["category"], "qty": v["qty"],
+        top.append({"id": iid, "name": it["name"], "category": it["category"], "price": it["price"], "qty": v["qty"],
                     "revenue": round(v["revenue"]), "profit": round(v["revenue"] - v["cost"]),
                     "margin": round(1 - it["cost"] / it["price"], 3) if it["price"] else None,
                     "change": _change(v["qty"], pv["qty"]), "stockouts": v["stockouts"]})

@@ -51,6 +51,7 @@ def test_demo_dashboard_forecast_and_plan(owner):
     assert info["items"] >= 8 and info["sales_rows"] > 1000
     d = owner.get("/api/dashboard?days=30").json()
     assert d["kpi"]["revenue"] > 0 and len(d["series"]) == 30 and d["items"][0]["abc"] == "A"
+    assert all(x["price"] > 0 and x["revenue"] == x["qty"] * x["price"] for x in d["items"])
     assert {x["level"] for x in d["series"] if x["level"]} <= {"ramai", "normal", "sepi"}
     f = owner.get("/api/forecast").json()
     assert len(f["dates"]) == 28 and f["start"] == "2026-11-17"

@@ -317,9 +317,10 @@ function MenuEarnings({ d }: { d: Dashboard }) {
                 <span className="num fig" style={{ fontSize: 16 }}>{rupiahShort(x.profit)}</span>
               </div>
               <div className="track"><i style={{ width: `${(Math.max(0, x.profit) / max) * 100}%` }} /></div>
-              <div className="row wrap tiny muted" style={{ marginTop: 4, gap: 10 }}>
+              <div className="row wrap tiny muted" style={{ marginTop: 4, gap: "2px 10px" }}>
                 <span>{catLabel(x.category)}</span>
-                <span className="num">{t("{n} porsi", { n: num(x.qty) })}</span>
+                <span className="num">{t("harga {rp}", { rp: rupiah(x.price) })}</span>
+                <span className="num">{t("{n} porsi terjual", { n: num(x.qty) })}</span>
                 <span className="num">{t("untung {p} per porsi", { p: pct(x.margin) })}</span>
                 {x.change !== null && <span className={`num ${x.change >= 0 ? "up" : "down"}`}>{x.change >= 0 ? "▲" : "▼"} {pct(Math.abs(x.change))}</span>}
                 {x.margin !== null && x.margin < 0.4 && <span className="badge warn">{t("untung tipis")}</span>}
