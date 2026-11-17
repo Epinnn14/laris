@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ml:
+    name: ML (data, features, planner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install --extra-index-url https://download.pytorch.org/whl/cpu -e "ml[train,test]"
+      - run: python -m pytest -q ml/tests
+      - name: training smoke test (CPU, 150 steps)
+        run: python -m laris_ml.train --shops 40 --val-shops 10 --steps 150 --batch 64 --out /tmp/smoke
+
+  model:
+    name: Model vs baselines
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e ./ml onnxruntime lightgbm
+      - name: evaluate the committed model on unseen synthetic shops
+        run: |
+          python -m laris_ml.evaluate --model models/larisnet --shops 120 --out /tmp/eval
+          cat /tmp/eval/eval.md >> "$GITHUB_STEP_SUMMARY"
+
+  backend:
+    name: Backend API
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 30
+    strategy:
+      matrix:
+        db: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e ./ml -e "./backend[test,postgres]"
+      - run: python -m pytest -q backend/tests
+        env:
+          LARIS_TEST_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql://postgres:postgres@127.0.0.1:5432/postgres' || '' }}
+
+  web:
+    name: Web app (build + browser e2e)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: pip install -e ./ml -e ./backend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: e2e in demo mode
+        run: |
+          LARIS_DEMO_MODE=1 LARIS_DATABASE_URL=sqlite:////tmp/e2e.db uvicorn laris_api.main:app --port 8000 &
+          for i in $(seq 60); do curl -sf localhost:8000/api/health && break; sleep 1; done
+          cd frontend && node e2e.mjs http://localhost:8000 ../shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: screenshots, path: shots/ }
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: [backend, web]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t laris:ci .
+      - name: smoke test the image
+        run: |
+          docker run -d --name laris -e LARIS_DEMO_MODE=1 -p 8000:8000 laris:ci
+          for i in $(seq 60); do curl -sf localhost:8000/api/health && break; sleep 1; done
+          curl -sf localhost:8000/api/health | grep '"available":true'
+          curl -sf localhost:8000/ | grep -q '<div id="root">'
+          curl -sf localhost:8000/api/forecast | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['method']=='larisnet' and len(d['items'])>5, d['method']"

@@ -1,0 +1,24 @@
+[project]
+name = "laris-api"
+version = "0.1.0"
+description = "Laris web app backend: sales and stock records, analytics, forecasts and shopping lists"
+requires-python = ">=3.10"
+dependencies = [
+  "laris-ml",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy>=2.0",
+  "onnxruntime>=1.18",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+test = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["laris_api*"]

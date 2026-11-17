@@ -1,0 +1,12 @@
+node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+data/
+*.db
+*.db-*
+.venv/
+models/**/model.pt
+results/

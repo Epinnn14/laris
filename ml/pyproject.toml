@@ -1,0 +1,21 @@
+[project]
+name = "laris-ml"
+version = "0.1.0"
+description = "Laris forecasting: synthetic warung/kafe data, a probabilistic sales forecaster, baselines and evaluation"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "hijridate>=2.5",
+]
+
+[project.optional-dependencies]
+train = ["torch>=2.3", "onnx>=1.16", "onnxruntime>=1.18", "lightgbm>=4.3"]
+test = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["laris_ml*"]

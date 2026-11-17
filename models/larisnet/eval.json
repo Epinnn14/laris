@@ -1,0 +1,83 @@
+{
+  "normal": {
+    "windows": 1278,
+    "LarisNet": {
+      "MASE": 0.66,
+      "wQL": 0.19,
+      "coverage80": 0.789,
+      "MAE": 8.77
+    },
+    "Same day last week": {
+      "MASE": 1.019,
+      "wQL": 0.331,
+      "coverage80": 0.763,
+      "MAE": 14.47
+    },
+    "Weekday average (8 wk)": {
+      "MASE": 0.778,
+      "wQL": 0.241,
+      "coverage80": 0.64,
+      "MAE": 10.51
+    },
+    "LightGBM (lags + calendar)": {
+      "MASE": 0.693,
+      "wQL": 0.2,
+      "coverage80": 0.787,
+      "MAE": 9.23
+    }
+  },
+  "lebaran": {
+    "windows": 2522,
+    "LarisNet": {
+      "MASE": 0.592,
+      "wQL": 0.202,
+      "coverage80": 0.787,
+      "MAE": 6.78
+    },
+    "Same day last week": {
+      "MASE": 0.985,
+      "wQL": 0.354,
+      "coverage80": 0.775,
+      "MAE": 11.54
+    },
+    "Weekday average (8 wk)": {
+      "MASE": 0.799,
+      "wQL": 0.294,
+      "coverage80": 0.593,
+      "MAE": 9.33
+    },
+    "LightGBM (lags + calendar)": {
+      "MASE": 0.627,
+      "wQL": 0.216,
+      "coverage80": 0.774,
+      "MAE": 7.19
+    }
+  },
+  "new_item": {
+    "windows": 1296,
+    "LarisNet": {
+      "MASE": 0.304,
+      "wQL": 0.211,
+      "coverage80": 0.804,
+      "MAE": 7.62
+    },
+    "Same day last week": {
+      "MASE": 0.46,
+      "wQL": 0.393,
+      "coverage80": 0.549,
+      "MAE": 12.68
+    },
+    "Weekday average (8 wk)": {
+      "MASE": 0.391,
+      "wQL": 0.355,
+      "coverage80": 0.283,
+      "MAE": 9.96
+    },
+    "LightGBM (lags + calendar)": {
+      "MASE": 0.343,
+      "wQL": 0.244,
+      "coverage80": 0.76,
+      "MAE": 8.65
+    }
+  }
+}

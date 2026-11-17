@@ -1,0 +1,15 @@
+# Laris on one computer:  docker compose up -d   ->  http://localhost:8000
+# Data lives in the Docker volume "laris-data" (SQLite), so it survives updates and restarts.
+# Phones and laptops on the same Wi-Fi can open http://<this-computer-ip>:8000
+services:
+  laris:
+    build: .
+    image: laris:local
+    ports: ["8000:8000"]
+    volumes: ["laris-data:/data"]
+    environment:
+      TZ: Asia/Jakarta
+    restart: unless-stopped
+
+volumes:
+  laris-data:
