@@ -5,6 +5,7 @@ import { num } from "../format";
 import { type Prefs } from "../prefs";
 import { EMPTY_PROFILE, HabitFields, ShopFields, type ProfileValue } from "../profile";
 import { ErrorBox, Loading, PageHead, Segmented, toast, useApi } from "../ui";
+import ReportDownload from "./ReportDownload";
 
 export default function Pengaturan({ state, prefs, onChange }: { state: AppState; prefs: Prefs; onChange: () => void }) {
   useLang();
@@ -66,10 +67,11 @@ export default function Pengaturan({ state, prefs, onChange }: { state: AppState
                        options={[{ value: "id", label: "Bahasa Indonesia" }, { value: "en", label: "English" }]} />
           </div>
         </section>
+        <ReportDownload />
         <section className="card pad stack" aria-labelledby="data-h">
           <h2 id="data-h">{t("Data")}</h2>
-          <a className="btn" style={{ alignSelf: "flex-start" }} href="/api/export/sales.csv">{t("Unduh semua penjualan (CSV)")}</a>
-          <div className="small muted">{t("Bisa dibuka di Excel atau Google Sheets.")}</div>
+          <a className="btn" style={{ alignSelf: "flex-start" }} href="/api/export/sales.csv" download>{t("Unduh semua penjualan (CSV)")}</a>
+          <div className="small muted">{t("Setiap baris satu menu per hari, sejak awal. Bisa dibuka di Excel atau Google Sheets.")}</div>
           {!state.demo_mode && (
             <>
               <hr className="rule" />

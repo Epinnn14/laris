@@ -176,5 +176,13 @@ Kalau Laris dipasang online (lihat [DEPLOY.md](DEPLOY.md)), cukup buka alamatnya
 
 ## 15. Data Anda
 
-- **Pengaturan → Unduh semua penjualan (CSV)** bisa dibuka di Excel atau Google Sheets.
+- **Unduh laporan** (di Ringkasan minggu dan Pengaturan): pilih Seminggu, Sebulan, atau Setahun. Nama filenya
+  `<nama toko>-hasil seminggu.csv`, `<nama toko>-hasil sebulan <bulan> <tahun>.csv`, atau
+  `<nama toko>-hasil setahun <tahun>.csv`. Isinya: ringkasan (omzet, modal bahan, bahan terbuang, pengeluaran,
+  untung bersih), keterangan per minggu (naik/turun, menu paling laku, hari paling ramai, hari yang belum dicatat),
+  hasil per hari atau per bulan, per menu, dan pengeluaran per jenis. Bisa dibuka di Excel atau Google Sheets.
+- **Pengaturan → Unduh semua penjualan (CSV)**: satu baris per menu per hari, sejak awal.
+- **Bahan sendiri**: di Stok bahan tekan **Bahan baru**, atau **Ubah** untuk mengganti nama, kemasan, dan harga.
+  Bahan yang tidak dipakai lagi bisa dihilangkan centang "Masih dipakai" (muncul di pilihan **Tidak dipakai**,
+  bisa **Pakai lagi**) atau **Hapus bahan**: dikeluarkan dari semua resep; kalau pernah dibeli, catatannya tetap ada.
 - Di laptop, data tersimpan di volume Docker `laris-data`. Online, data tersimpan di database Postgres milik Anda.

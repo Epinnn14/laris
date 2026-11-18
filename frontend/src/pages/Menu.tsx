@@ -186,7 +186,7 @@ function ItemDialog({ item, ings, margin, onClose, onDone }: { item: MenuItem | 
   );
 }
 
-function IngredientDialog({ ing, onClose, onDone }: { ing: Ingredient | null; onClose: () => void; onDone: () => void }) {
+export function IngredientDialog({ ing, onClose, onDone }: { ing: Ingredient | null; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState(ing?.name ?? "");
   const [unit, setUnit] = useState<Ingredient["unit"]>(ing?.unit ?? "g");
   const [packSize, setPackSize] = useState(String(ing?.pack_size ?? 1000));
@@ -209,9 +209,24 @@ function IngredientDialog({ ing, onClose, onDone }: { ing: Ingredient | null; on
       onClose();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
+  const remove = async () => {
+    if (!ing) return;
+    const ask = ing.used_in.length
+      ? t("{name} dipakai di resep: {list}. Kalau dihapus, bahan ini juga dikeluarkan dari resep itu dan modal per porsinya ikut berubah. Hapus?", { name: ing.name, list: ing.used_in.join(", ") })
+      : t("Hapus {name} dari daftar bahan?", { name: ing.name });
+    if (!confirm(ask)) return;
+    setBusy(true);
+    try {
+      const r = await api.del<{ removed: string }>(`/ingredients/${ing.id}`);
+      toast(r.removed === "hidden" ? t("{name} disembunyikan. Catatan beli dan buang yang lama tetap ada.", { name: ing.name }) : t("{name} dihapus", { name: ing.name }));
+      onDone();
+      onClose();
+    } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
 
   return (
     <Dialog title={ing ? t("Ubah {name}", { name: ing.name }) : t("Bahan baru")} onClose={onClose} footer={<>
+      {ing && <button className="btn danger" style={{ marginRight: "auto" }} onClick={remove} disabled={busy}>{t("Hapus bahan")}</button>}
       <button className="btn" onClick={onClose}>{t("Batal")}</button>
       <button className="btn primary" onClick={save} disabled={busy || !name}>{t("Simpan")}</button></>}>
       <div className="field"><label htmlFor="gn">{t("Nama bahan")}</label><input id="gn" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
@@ -231,6 +246,8 @@ function IngredientDialog({ ing, onClose, onDone }: { ing: Ingredient | null; on
           <span className="hint">{t("0 kalau bisa dibeli langsung di warung sebelah")}</span></div>
       </div>
       <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{t("Masih dipakai")}</label>
+      <span className="hint">{ing?.used_in.length ? t("Ada di resep: {list}.", { list: ing.used_in.join(", ") }) : t("Belum ada di resep mana pun. Tambahkan lewat Menu & resep → Ubah menu.")}
+        {" "}{t("Tidak dipakai lagi? Hilangkan centang supaya tidak muncul di stok dan daftar belanja.")}</span>
     </Dialog>
   );
 }

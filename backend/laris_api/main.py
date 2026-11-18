@@ -10,19 +10,20 @@ import io
 import os
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from laris_ml import features as F
 from laris_ml.catalog import INGREDIENTS, MENUS
 
-from . import analytics, auth, backup, demo, kios, store, summary
+from . import analytics, auth, backup, demo, kios, report, store, summary
 from .db import Database
 from .forecasting import SENSITIVITY, Forecasts, scenario
 from .models import (DailySale, DayStatus, Expense, Ingredient, MenuItem, Note, Order, PreOrder, PreOrderLine, PromoPlan,
@@ -397,15 +398,41 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             raise HTTPException(404, "Menu tidak ada")
         return save_menu(it, body, s)
 
-    def ingredient_out(g: Ingredient, levels: dict[int, float]) -> dict:
+    def used_in(s: Session) -> dict[int, list[str]]:
+        """Which menu items each ingredient is in, by name."""
+        out: dict[int, list[str]] = {}
+        for ing_id, name in s.execute(select(RecipeLine.ingredient_id, MenuItem.name).join(MenuItem)
+                                      .order_by(MenuItem.name)):
+            out.setdefault(ing_id, []).append(name)
+        return out
+
+    def ingredient_out(g: Ingredient, levels: dict[int, float], uses: dict[int, list[str]]) -> dict:
         return {"id": g.id, "name": g.name, "unit": g.unit, "cost_per_unit": g.cost_per_unit,
                 "shelf_life_days": g.shelf_life_days, "lead_time_days": g.lead_time_days, "pack_size": g.pack_size,
-                "pack_name": g.pack_name, "active": g.active, "on_hand": round(levels.get(g.id, 0.0), 1)}
+                "pack_name": g.pack_name, "active": g.active, "on_hand": round(levels.get(g.id, 0.0), 1),
+                "used_in": uses.get(g.id, [])}
 
     @app.get("/api/ingredients")
     def get_ingredients(all: bool = False, s: Session = Depends(authed)):
-        levels = store.stock_levels(s)
-        return [ingredient_out(g, levels) for g in store.ingredients(s, active_only=not all)]
+        levels, uses = store.stock_levels(s), used_in(s)
+        return [ingredient_out(g, levels, uses) for g in store.ingredients(s, active_only=not all)]
+
+    @app.delete("/api/ingredients/{ing_id}")
+    def delete_ingredient(ing_id: int, s: Session = Depends(authed)):
+        """Take an ingredient out of every recipe. One with stock history is only hidden, so past
+        purchases and waste keep their names; one never touched is removed for good."""
+        g = s.get(Ingredient, ing_id)
+        if not g:
+            raise HTTPException(404, "Bahan tidak ada")
+        s.execute(delete(RecipeLine).where(RecipeLine.ingredient_id == ing_id))
+        history = s.scalar(select(func.count()).select_from(StockMove).where(StockMove.ingredient_id == ing_id))
+        if history:
+            g.active = False
+        else:
+            s.delete(g)
+        store.bump(s)
+        s.commit()
+        return {"removed": "hidden" if history else "deleted"}
 
     @app.post("/api/ingredients", status_code=201)
     def add_ingredient(body: IngredientIn, s: Session = Depends(authed)):
@@ -413,7 +440,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         s.add(g)
         store.bump(s)
         s.commit()
-        return ingredient_out(g, store.stock_levels(s))
+        return ingredient_out(g, store.stock_levels(s), used_in(s))
 
     @app.put("/api/ingredients/{ing_id}")
     def edit_ingredient(ing_id: int, body: IngredientIn, s: Session = Depends(authed)):
@@ -424,7 +451,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             setattr(g, k, v)
         store.bump(s)
         s.commit()
-        return ingredient_out(g, store.stock_levels(s))
+        return ingredient_out(g, store.stock_levels(s), used_in(s))
 
     @app.get("/api/catalog")
     def catalog(business: str = "warung_makan"):  # public: the sign-up form shows it
@@ -840,6 +867,25 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             raise HTTPException(422, "Data contoh hanya ada untuk warung makan dan kafe")
         return demo.load(s, body.business)
 
+    def csv_response(name: str, text: str) -> StreamingResponse:
+        # BOM so Excel reads the shop's own names (é, –) right; plain fallback name for old browsers
+        ascii_name = name.encode("ascii", "ignore").decode() or "laris.csv"
+        return StreamingResponse(iter(["\ufeff" + text]), media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"})
+
+    @app.get("/api/export/options")
+    def export_options(s: Session = Depends(authed)):
+        first = s.scalar(select(func.min(DailySale.day)))
+        return {"first": first.isoformat() if first else None, "today": store.today(s).isoformat()}
+
+    @app.get("/api/export/report.csv")
+    def export_report(period: str = Query("week", pattern="^(week|month|year)$"),
+                      month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+                      year: int | None = Query(None, ge=2000, le=2100), lang: str = "id",
+                      s: Session = Depends(authed)):
+        name, text = report.build(s, period, lang, month, year)
+        return csv_response(name, text)
+
     @app.get("/api/export/sales.csv")
     def export_sales(s: Session = Depends(authed)):
         items = {it.id: it for it in store.menu(s, active_only=False)}
@@ -851,9 +897,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             if it:
                 w.writerow([r.day.isoformat(), it.name, it.category, it.price, r.qty, int(r.stockout), int(r.promo),
                             r.qty * it.price])
-        buf.seek(0)
-        return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
-                                 headers={"Content-Disposition": "attachment; filename=laris-penjualan.csv"})
+        return csv_response(f"{report.safe_name(store.get(s, 'shop_name'))}-semua penjualan.csv", buf.getvalue())
 
     # ---- the web app
 

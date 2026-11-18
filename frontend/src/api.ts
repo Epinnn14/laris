@@ -130,6 +130,7 @@ export interface MenuItem {
 export interface Ingredient {
   id: number; name: string; unit: "g" | "ml" | "pcs"; cost_per_unit: number; shelf_life_days: number;
   lead_time_days: number; pack_size: number; pack_name: string; active: boolean; on_hand: number;
+  used_in: string[];
 }
 
 export interface SalesDay {

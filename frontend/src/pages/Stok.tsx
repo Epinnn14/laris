@@ -3,6 +3,7 @@ import { api, type Ingredient, type Plan, type StockMove } from "../api";
 import { amount, dayWithName, dec, rupiah, rupiahShort, unitLabel } from "../format";
 import { t, useLang } from "../i18n";
 import { Dialog, ErrorBox, Loading, PageHead, Segmented, toast, useApi } from "../ui";
+import { IngredientDialog } from "./Menu";
 
 type Kind = "beli" | "buang" | "opname";
 const KIND_LABEL: Record<string, string> = { beli: "Beli", buang: "Buang", opname: "Hitung stok", pakai: "Pakai" };
@@ -17,32 +18,45 @@ function status(days: number | null | undefined, lead: number): { label: string;
 
 export default function Stok({ today }: { today: string }) {
   useLang();
-  const ings = useApi<Ingredient[]>("/ingredients");
+  const ings = useApi<Ingredient[]>("/ingredients?all=true");
   const plan = useApi<Plan>("/plan");
   const moves = useApi<StockMove[]>("/stock/moves?limit=30");
   const [active, setActive] = useState<{ ing: Ingredient; kind: Kind } | null>(null);
-  const [filter, setFilter] = useState<"semua" | "menipis">("semua");
+  const [filter, setFilter] = useState<"semua" | "menipis" | "lama">("semua");
+  const [edit, setEdit] = useState<Ingredient | "new" | null>(null);
 
   const byId = useMemo(() => new Map((plan.data?.items ?? []).map((p) => [p.id, p])), [plan.data]);
   if (ings.error) return <ErrorBox message={ings.error} retry={ings.reload} />;
   if (!ings.data) return <Loading />;
   const rows = ings.data
-    .map((g) => ({ g, p: byId.get(g.id), s: status(byId.get(g.id)?.days_left, g.lead_time_days) }))
-    .filter((r) => filter === "semua" || r.s.cls === "bad" || r.s.cls === "warn")
+    .map((g) => ({ g, p: byId.get(g.id), s: !g.active ? { label: t("Tidak dipakai"), cls: "", fill: 0 }
+      : g.used_in.length === 0 ? { label: t("Belum ada di resep"), cls: "", fill: 0 }
+      : status(byId.get(g.id)?.days_left, g.lead_time_days) }))
+    .filter((r) => filter === "lama" ? !r.g.active
+      : r.g.active && (filter === "semua" || r.s.cls === "bad" || r.s.cls === "warn"))
     .sort((a, b) => (a.p?.days_left ?? 1e9) - (b.p?.days_left ?? 1e9));
 
   const done = () => { ings.reload(); plan.reload(); moves.reload(); };
+  const hidden = ings.data.filter((g) => !g.active).length;
+  const reuse = async (g: Ingredient) => {
+    const { on_hand: _o, used_in: _u, id: _i, ...body } = g;
+    try { await api.put(`/ingredients/${g.id}`, { ...body, active: true }); toast(t("{name} dipakai lagi", { name: g.name })); done(); }
+    catch (e) { toast((e as Error).message); }
+  };
 
   return (
     <>
       <PageHead title={t("Stok bahan")} sub={t("Berkurang otomatis dari penjualan. Catat di sini saat beli, ada yang basi, atau setelah menghitung stok.")}>
         <Segmented label={t("Tampilkan")} value={filter} onChange={setFilter}
-                   options={[{ value: "semua", label: t("Semua") }, { value: "menipis", label: t("Menipis") }]} />
+                   options={[{ value: "semua", label: t("Semua") }, { value: "menipis", label: t("Menipis") },
+                             ...(hidden ? [{ value: "lama" as const, label: t("Tidak dipakai ({n})", { n: hidden }) }] : [])]} />
+        <button className="btn primary" onClick={() => setEdit("new")}>{t("Bahan baru")}</button>
       </PageHead>
 
       <div className="card">
         <div className="list">
-          {rows.length === 0 && <div className="empty">{filter === "menipis" ? t("Tidak ada bahan yang menipis.") : t("Belum ada bahan. Tambahkan lewat Menu & resep.")}</div>}
+          {rows.length === 0 && <div className="empty">{filter === "menipis" ? t("Tidak ada bahan yang menipis.")
+            : filter === "lama" ? t("Semua bahan masih dipakai.") : t("Belum ada bahan. Tekan Bahan baru untuk menambahkan.")}</div>}
           {rows.map(({ g, p, s }) => (
             <div key={g.id} className="list-item" style={{ flexWrap: "wrap" }}>
               <div className="grow" style={{ minWidth: 180 }}>
@@ -53,11 +67,15 @@ export default function Stok({ today }: { today: string }) {
                 <div className={`track ${s.cls}`} style={{ marginTop: 6, maxWidth: 280, height: 8 }} aria-hidden="true"><i style={{ width: `${s.fill * 100}%` }} /></div>
               </div>
               <span className={`badge ${s.cls}`} title={t("Perkiraan stok cukup untuk berapa hari")}>{s.label}</span>
-              <div className="row">
+              {g.active ? <div className="row wrap">
                 <button className="btn small primary" onClick={() => setActive({ ing: g, kind: "beli" })}>{t("Beli")}</button>
                 <button className="btn small" onClick={() => setActive({ ing: g, kind: "opname" })}>{t("Hitung")}</button>
                 <button className="btn small" onClick={() => setActive({ ing: g, kind: "buang" })}>{t("Buang")}</button>
-              </div>
+                <button className="btn small ghost" onClick={() => setEdit(g)} aria-label={t("Ubah {name}", { name: g.name })}>{t("Ubah")}</button>
+              </div> : <div className="row wrap">
+                <button className="btn small" onClick={() => reuse(g)}>{t("Pakai lagi")}</button>
+                <button className="btn small ghost" onClick={() => setEdit(g)} aria-label={t("Ubah {name}", { name: g.name })}>{t("Ubah")}</button>
+              </div>}
             </div>
           ))}
         </div>
@@ -79,6 +97,7 @@ export default function Stok({ today }: { today: string }) {
         </div>
       </div>
 
+      {edit && <IngredientDialog ing={edit === "new" ? null : edit} onClose={() => setEdit(null)} onDone={done} />}
       {active && <StockDialog ing={active.ing} kind={active.kind} today={today} onClose={() => setActive(null)} onDone={done} />}
     </>
   );

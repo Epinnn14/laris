@@ -323,3 +323,44 @@ def test_reset_starts_over(owner):
     assert st["setup_needed"] and not st["authed"] and st["today"] == "2026-11-17"
     owner.post("/api/setup", json={"shop_name": "Baru", "password": "rahasia1"})
     assert owner.get("/api/menu").json() == [] and owner.get("/api/notes").json() == []
+
+
+def test_reports_week_month_year(owner):
+    owner.post("/api/demo", json={"business": "warung_makan"})
+    owner.put("/api/settings", json={"shop_name": "Warung Nona"})
+    r = owner.get("/api/export/report.csv?period=week")
+    assert r.status_code == 200 and r.text.startswith("﻿Laporan,Warung Nona")
+    assert "Warung%20Nona-hasil%20seminggu.csv" in r.headers["content-disposition"]
+    assert "10 November 2026 sampai 16 November 2026" in r.text and "Keterangan" in r.text and "Per hari" in r.text
+    assert "Paling laku" in r.text
+    m = owner.get("/api/export/report.csv?period=month&month=2026-10")
+    assert "hasil%20sebulan%20Oktober%202026.csv" in m.headers["content-disposition"]
+    weeks = [ln for ln in m.text.splitlines() if ln.startswith("Minggu ")]
+    assert len(weeks) == 5 and "2026-10-01,2026-10-04" in weeks[0]  # 1 Oct 2026 is a Thursday
+    y = owner.get("/api/export/report.csv?period=year&lang=en")
+    assert "yearly%20results%202026.csv" in y.headers["content-disposition"]
+    assert "Per month" in y.text and "Per week" in y.text and "Per day" not in y.text
+    assert owner.get("/api/export/report.csv?period=decade").status_code == 422
+    opts = owner.get("/api/export/options").json()
+    assert opts["first"] < "2026-11-17" and opts["today"] == "2026-11-17"
+
+
+def test_own_ingredients_edit_and_remove(owner):
+    owner.post("/api/catalog/apply", json={"items": ["esteh"]})
+    ings = owner.get("/api/ingredients").json()
+    tea = next(g for g in ings if g["used_in"])
+    assert tea["used_in"] == ["Es Teh Manis"]
+    body = {"name": "Daun pandan", "unit": "pcs", "cost_per_unit": 500, "shelf_life_days": 3, "lead_time_days": 0,
+            "pack_size": 10, "pack_name": "ikat"}
+    new = owner.post("/api/ingredients", json=body).json()
+    assert new["used_in"] == [] and new["active"]
+    assert owner.put(f"/api/ingredients/{new['id']}", json={**body, "name": "Pandan"}).json()["name"] == "Pandan"
+    # never used: gone for good
+    assert owner.delete(f"/api/ingredients/{new['id']}").json() == {"removed": "deleted"}
+    assert all(g["id"] != new["id"] for g in owner.get("/api/ingredients?all=true").json())
+    # bought before: hidden, out of the recipe, history kept
+    owner.post("/api/stock", json={"ingredient_id": tea["id"], "kind": "beli", "qty": 100, "cost": 5000})
+    assert owner.delete(f"/api/ingredients/{tea['id']}").json() == {"removed": "hidden"}
+    assert all(g["id"] != tea["id"] for g in owner.get("/api/ingredients").json())
+    assert all(r["ingredient_id"] != tea["id"] for r in owner.get("/api/menu").json()[0]["recipe"])
+    assert any(m["ingredient_id"] == tea["id"] for m in owner.get("/api/stock/moves").json())

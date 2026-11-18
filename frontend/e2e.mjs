@@ -143,6 +143,31 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
   await page.waitForTimeout(800);
   expect(await page.getByRole("row", { name: /Rp123\.456/ }).count() === 0, "deleted expense still listed");
 
+  // reports to download: a week, a month, a year, each named after the shop
+  await page.goto(`${base}/#/ringkasan`);
+  for (const [label, re] of [["Seminggu", /-hasil seminggu\.csv$/], ["Sebulan", /-hasil sebulan \S+ \d{4}\.csv$/], ["Setahun", /-hasil setahun \d{4}\.csv$/]]) {
+    await page.getByRole("group", { name: "Jangka waktu laporan" }).getByRole("button", { name: label, exact: true }).click();
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }), page.getByRole("link", { name: "Unduh CSV" }).click()]);
+    if (!re.test(dl.suggestedFilename())) problems.push(`report ${label}: file named ${dl.suggestedFilename()}`);
+    const text = await (await import("node:fs/promises")).readFile(await dl.path(), "utf8");
+    if (!text.includes(label === "Seminggu" ? "Keterangan" : "Per minggu")) problems.push(`report ${label}: no weekly notes`);
+  }
+
+  // an ingredient of the owner's own: add, edit, remove
+  await page.goto(`${base}/#/stok`);
+  await page.getByRole("button", { name: "Bahan baru" }).click();
+  await page.fill("#gn", "Daun pandan uji");
+  await page.getByRole("dialog").getByRole("button", { name: "Simpan" }).click();
+  await page.getByText("Daun pandan uji").first().waitFor({ timeout: 10000 }).catch(() => problems.push("new ingredient not listed on stock"));
+  await page.getByRole("button", { name: "Ubah Daun pandan uji" }).click();
+  await page.fill("#gn", "Pandan uji");
+  await page.getByRole("dialog").getByRole("button", { name: "Simpan" }).click();
+  await page.getByText("Pandan uji", { exact: true }).first().waitFor({ timeout: 10000 }).catch(() => problems.push("ingredient rename not shown"));
+  await page.getByRole("button", { name: "Ubah Pandan uji" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Hapus bahan" }).click();
+  await page.waitForTimeout(800);
+  expect(await page.getByText("Pandan uji", { exact: true }).count() === 0, "removed ingredient still listed");
+
   // the till: two portions of the first item, paid in cash, then cancelled
   await page.goto(`${base}/#/kasir`);
   await page.locator(".till-item").first().click();

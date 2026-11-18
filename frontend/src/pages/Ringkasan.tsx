@@ -3,6 +3,7 @@ import type { AppState, Summary } from "../api";
 import { t, useLang } from "../i18n";
 import { dayShort, dayWithName, monthName, num, pct, rupiah, rupiahShort, weekdayName, weekdayShort } from "../format";
 import { ErrorBox, Icon, Loading, PageHead, toast, useApi } from "../ui";
+import ReportDownload from "./ReportDownload";
 
 function changeWords(x: number | null): string {
   if (x === null) return "";
@@ -155,6 +156,7 @@ export default function Ringkasan({ state }: { state: AppState }) {
               )}
             </div>
           </section>
+          <ReportDownload weekStart={w.start} weekEnd={w.end} />
         </div>
       </div>
     </>
