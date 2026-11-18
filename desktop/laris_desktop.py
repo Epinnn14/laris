@@ -144,11 +144,12 @@ def open_app(port: int) -> None:
     webbrowser.open(f"http://localhost:{port}")
 
 
-def laris_running(port: int) -> bool:
+def laris_running(port: int, data: Path) -> bool:
+    """True when this laptop's own Laris (same data folder) already runs on the port."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1.5) as r:
-            return b'"model"' in r.read()
-    except OSError:
+            return json.loads(r.read()).get("instance") == str(data)
+    except (OSError, ValueError, AttributeError):
         return False
 
 
@@ -173,6 +174,7 @@ class Server:
         os.environ.setdefault("LARIS_STATIC_DIR", str(web_dir()))
         os.environ.setdefault("LARIS_MODEL_DIR", str(model_dir()))
         os.environ["LARIS_NO_AUTOAPP"] = "1"
+        os.environ["LARIS_INSTANCE"] = str(data)
         import uvicorn
         from laris_api import backup
         from laris_api.main import create_app
@@ -413,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
         return selftest()
     if not a.headless:
         for p in PORTS:  # already running: just show it
-            if laris_running(p):
+            if laris_running(p, data):
                 open_app(p)
                 return 0
     port = free_port()

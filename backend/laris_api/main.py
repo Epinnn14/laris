@@ -243,7 +243,9 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.get("/api/health")
     def health():
-        return {"ok": True, "model": forecasts.info()}
+        # the Windows app sets LARIS_INSTANCE to its data folder, so it never mistakes another Laris
+        # (Docker, a dev server) on the same port for its own
+        return {"ok": True, "model": forecasts.info(), "instance": os.environ.get("LARIS_INSTANCE", "")}
 
     @app.get("/api/state")
     def state(request: Request, s: Session = Depends(session)):
