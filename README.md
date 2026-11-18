@@ -1,13 +1,21 @@
 # Laris
 
 [![ci](https://github.com/Epinnn14/laris/actions/workflows/ci.yaml/badge.svg)](https://github.com/Epinnn14/laris/actions/workflows/ci.yaml)
+[![windows app](https://github.com/Epinnn14/laris/actions/workflows/windows.yaml/badge.svg)](https://github.com/Epinnn14/laris/actions/workflows/windows.yaml)
+[![release](https://img.shields.io/github/v/release/Epinnn14/laris)](https://github.com/Epinnn14/laris/releases/latest)
 
-**Sales analytics, demand forecasting and ingredient planning for Indonesian warung makan and cafés.**
+**Sales analytics, till, demand forecasting and ingredient planning for Indonesian warung makan,
+cafés and grocery kiosks.** Runs offline on the shop laptop and opens on any phone on the same WiFi.
 *Catat penjualan, pantau stok bahan, dan tahu besok harus belanja apa.*
+
+**Download for Windows:** [Laris-Setup (latest release)](https://github.com/Epinnn14/laris/releases/latest).
+No Docker, no terminal: install, scan the QR code with the cashier's phone, sell.
+Indonesian setup guide: [docs/PASANG.md](docs/PASANG.md).
 
 A small food stall decides every evening how much chicken, rice and milk to buy for tomorrow.
 Buy too little and the best seller runs out at lunch. Buy too much and fresh ingredients spoil.
-Laris turns the daily sales the owner already writes down into answers to three questions:
+Laris turns what the shop already records, orders at the till or the day's totals in the evening,
+into answers to three questions:
 
 1. **How is the business doing?** A cash-book statement from sales down to net profit (ingredients
    used, waste, and running costs such as gas, rent and wages), progress towards the monthly
@@ -22,9 +30,9 @@ Laris turns the daily sales the owner already writes down into answers to three 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-<p align="center"><img src="docs/screenshots/phone-catat.png" width="200" alt="Recording sales on a phone">
+<p align="center"><img src="docs/screenshots/phone-kasir.png" width="200" alt="Taking payment at the till on a phone">
+<img src="docs/screenshots/phone-pesanan.png" width="200" alt="Special orders on a phone">
 <img src="docs/screenshots/phone-belanja.png" width="200" alt="Shopping list on a phone">
-<img src="docs/screenshots/phone-simulasi.png" width="200" alt="What-if on a phone">
 <img src="docs/screenshots/phone-ringkasan.png" width="200" alt="Weekly summary on a phone"></p>
 
 Also in the app:
@@ -47,7 +55,7 @@ Also in the app:
 - **What if:** a new price or a promotion for one item, compared with the current forecast for
   the next 4 weeks. The promotion effect comes from the model; the price effect uses a rough
   price sensitivity the owner picks, and the page says so.
-- **Price suggestions** from the recipe cost and the wished margin.
+- **Price suggestions** from the cost per portion and the wished margin.
 - **Light and dark** display and **Indonesian or English**.
 - **Kios / toko kelontong:** each good is its own stock. The model has only seen warung and café
   patterns, so a kios is forecast with the warung pattern; the in-app backtest shows how well that
@@ -55,15 +63,18 @@ Also in the app:
 
 ![Dashboard in dark mode, in English](docs/screenshots/dashboard-dark-en.png)
 
-The app is built for phones first. It runs on a laptop with one
-`docker compose up`, or online for free (Render + Neon). The model runs on CPU through
-onnxruntime, so it needs no GPU and no internet. Owners: see the [Indonesian guide](docs/PANDUAN.md).
+<p align="center"><img src="docs/screenshots/desktop-window.png" width="300" alt="The Laris window on the shop laptop: address, QR code for phones, backups"></p>
+
+The app is built for phones first. On a shop laptop it is one Windows installer; it also runs
+with `docker compose up`, or online (Render + Neon). The model runs on CPU through onnxruntime,
+so it needs no GPU and no internet. Owners: see the [Indonesian guide](docs/PANDUAN.md).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  R[Daily sales, closures, promos<br/>recorded in the app] --> W[Last 8 weeks per menu item<br/>+ known calendar of the next 4]
+  K[Till orders] --> R
+  R[Daily totals, closures, promos] --> W[Last 8 weeks per menu item<br/>+ known calendar of the next 4]
   C[Indonesian calendar<br/>Hijri dates, holidays, paydays] --> W
   W --> M[LarisNet<br/>ONNX, CPU]
   M --> Q[Quantiles per item per day<br/>10/25/50/75/90/95%]
@@ -71,11 +82,13 @@ flowchart LR
   S --> T[Revenue and portion forecasts]
   S --> P[Ingredient demand via recipes]
   P --> B[Shopping list<br/>lead time, cycle, shelf life, packs, service level]
+  O[Special orders<br/>due date, items] --> B
   R --> A[Dashboard analytics]
 ```
 
-**Recording drives everything.** When the owner saves a day's sales, the ingredients the recipes
-used are booked as stock movements. Stock is the sum of its movements: purchases, use, waste and
+**Recording drives everything.** Each till order adds to the day's totals, and the owner can also
+type the totals in the evening. When a day's sales change, the ingredients the recipes used are
+booked as stock movements. Stock is the sum of its movements: purchases, use, waste and
 stock counts. Every number can be traced, and editing a past day rebooks its usage.
 
 ### The model: LarisNet
@@ -223,7 +236,7 @@ frontend/src/       React + TypeScript + Recharts, mobile-first, Indonesian and 
 models/larisnet/    model.onnx + meta.json + eval results (the app's model)
 notebooks/          training on Colab / Kaggle GPUs
 desktop/            Windows app: launcher window, PyInstaller spec, Inno Setup installer
-docs/               owner guide (ID), deployment (ID)
+docs/               owner guide, laptop install guide, deployment (all ID)
 ```
 
 ## Tests and CI
