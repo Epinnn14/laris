@@ -143,6 +143,7 @@ main { padding: 26px 32px 56px; max-width: 1200px; width: 100%; }
 /* ---------- sheets (cards) */
 .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); }
 .card.pad { padding: 18px; }
+.card-head > a { white-space: nowrap; }
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 16px 18px 0; }
 .card-head p { margin-top: 3px; }
 .card-body { padding: 14px 18px 18px; }

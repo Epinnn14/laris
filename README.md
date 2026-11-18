@@ -33,37 +33,83 @@ into answers to three questions:
 <p align="center"><img src="docs/screenshots/phone-kasir.png" width="200" alt="Taking payment at the till on a phone">
 <img src="docs/screenshots/phone-pesanan.png" width="200" alt="Special orders on a phone">
 <img src="docs/screenshots/phone-belanja.png" width="200" alt="Shopping list on a phone">
-<img src="docs/screenshots/phone-ringkasan.png" width="200" alt="Weekly summary on a phone"></p>
+<img src="docs/screenshots/phone-laporan.png" width="200" alt="Downloading a weekly, monthly or yearly report on a phone"></p>
 
-Also in the app:
+## Features
 
-- **Till (kasir):** tap items, take cash/QRIS/transfer with change worked out, save. Each order adds
-  to the day's totals, so stock, the dashboard and the forecast follow the till. Several phones
-  can sell at once; the dashboard shows today's live numbers and the busiest hours.
-- **Special orders (pesanan):** boxed meals and catering with customer, due date, down payment and
-  status. Their ingredients are added to the shopping list before they are due; they are kept out
-  of the forecast's history.
-- **Notes board**: sticky notes on a cork board, dragged anywhere, in six paper colours, pinned ones first on the dashboard.
-- **Sign-up wizard** that asks for the shop's name, owner, type (warung makan, café, or kios /
-  toko kelontong), open days, shopping habit, monthly target and wished margin, then starts from
-  sample data, a sample menu or sample goods, or empty.
+**Recording sales**
+
+- **Till (kasir):** tap items, take cash, QRIS or transfer with the change worked out, save, cancel
+  if needed. Each order adds to the day's totals, so stock, the dashboard and the forecast follow
+  the till. Several phones can sell at once; the dashboard shows today's live numbers and the
+  busiest hours.
+- **Daily totals:** shops without a till type how many portions of each item sold, in the evening.
+  Closed days, regular days off, sold-out items and promotions are marked so the forecast learns
+  from them correctly.
+- **Special orders (pesanan):** boxed meals and catering with customer, WhatsApp number, due date
+  and time, down payment and status. Their ingredients are added to the shopping list before they
+  are due; finished orders count in the money but stay out of the forecast's history.
+
+**Money**
+
+- **Cash book:** sales down to net profit (ingredients used, waste, and other costs), and how each
+  Rp100,000 that comes in splits into ingredients, waste, costs and profit.
+- **Expenses** (gas, electricity and water, rent, wages, packaging, transport) so net profit is real.
+- **Monthly target** with progress, the likely month end, the chance of reaching it and what is
+  needed per open day.
 - **Simple costing:** "I spend Rp120,000 and it makes 30 portions" sets the cost per portion;
   linking ingredients is optional and only needed for automatic stock.
-- **Expenses** (gas, electricity, rent, wages, packaging, fuel) so net profit is real.
-- **Weekly summary** in plain sentences: what rose, what fell, best sellers, what needs attention,
-  sales tips for next week, expected sales and most urgent purchases, copied to WhatsApp in one tap.
+- **Price suggestions** from the cost per portion and the wished margin (10–90%).
 - **What if:** a new price or a promotion for one item, compared with the current forecast for
   the next 4 weeks. The promotion effect comes from the model; the price effect uses a rough
   price sensitivity the owner picks, and the page says so.
-- **Price suggestions** from the cost per portion and the wished margin.
+
+**Stock and shopping**
+
+- **Ingredient stock** goes down by itself with every sale. Purchases, waste and stock counts are
+  one tap each, and every movement is listed.
+- **The owner's own ingredients:** add new ones, edit name, pack and price, hide those no longer
+  used (and bring them back), or remove them from every recipe. Ingredients with purchase history
+  are hidden rather than deleted, so old records keep their names.
+- **Shopping list** per trip, from the forecast, the recipes and the special orders, with the
+  reason for each item, copied to WhatsApp in one tap.
+
+**Reports**
+
+- **Weekly summary** in plain sentences: what rose, what fell, best sellers, what needs attention,
+  sales tips for next week, expected sales and most urgent purchases, copied to WhatsApp.
+- **CSV reports for a week, a month or a year,** named after the shop
+  (`Warung Bu Sri-hasil seminggu.csv`, `…-hasil sebulan November 2026.csv`,
+  `…-hasil setahun 2026.csv`). Each has the money summary, a plain-words note for every week
+  (up or down on the week before, best seller, busiest day, items that sold out early, days not
+  recorded, days closed), results per day or per month, per menu item and per expense type. They
+  open in Excel or Google Sheets, in Indonesian or English. All sales since the start can also be
+  downloaded as one table.
+
+**Every day**
+
+- **Notes board:** sticky notes on a cork board for a supplier's number, a new dish idea, or who
+  still owes money. Drag them anywhere (mouse, finger or arrow keys), pick one of six paper colours,
+  pin the important ones; pinned notes come first in the strip on the dashboard.
+
+**Setting up and keeping data safe**
+
+- **Sign-up wizard** for new shops: name, owner, type (warung makan, café, or kios / toko
+  kelontong), open days, shopping habit, monthly target and wished margin, then the menu actually
+  sold (picked from a sample menu with the owner's prices, typed in, or sample data to try first).
+  Settings → **Start over** wipes the shop after a backup to go through it again.
+- **Backups:** a daily copy on the laptop (30 kept), an optional second folder (flash drive or
+  Google Drive), and restore from the laptop window.
 - **Light and dark** display and **Indonesian or English**.
 - **Kios / toko kelontong:** each good is its own stock. The model has only seen warung and café
   patterns, so a kios is forecast with the warung pattern; the in-app backtest shows how well that
   fits after four weeks.
 
+![Notes board: sticky notes on cork](docs/screenshots/notes-board.png)
+
 ![Dashboard in dark mode, in English](docs/screenshots/dashboard-dark-en.png)
 
-<p align="center"><img src="docs/screenshots/desktop-window.png" width="300" alt="The Laris window on the shop laptop: address, QR code for phones, backups"></p>
+<p align="center"><img src="docs/screenshots/desktop-window.png" width="300" alt="The Laris control window on the shop laptop: QR code for phones, backups"></p>
 
 The app is built for phones first. On a shop laptop it is one Windows installer; it also runs
 with `docker compose up`, or online (Render + Neon). The model runs on CPU through onnxruntime,
@@ -198,7 +244,9 @@ risk and a plain-language reason for each item, and copies to WhatsApp in one ta
   and install it. Laris opens in its own window (Edge or Chrome app mode at
   `laris.localhost`, no address bar). A small control window shows a QR code for phones on the same
   WiFi, makes a daily backup to Documents (plus an optional flash drive or Google Drive folder),
-  restores a backup, and resets the password. Guide in Indonesian: [docs/PASANG.md](docs/PASANG.md).
+  restores a backup, and resets the password. The app only reuses a Laris that runs on its own
+  data folder, so an older Docker or development copy on the same port is left alone.
+  Guide in Indonesian: [docs/PASANG.md](docs/PASANG.md).
   The installer is built and self-tested by [`windows.yaml`](.github/workflows/windows.yaml)
   (PyInstaller + Inno Setup); a `v*` tag attaches it to a release.
 - **Docker:**
@@ -231,8 +279,8 @@ python -m laris_ml.evaluate --model models/larisnet
 ```
 ml/laris_ml/        calendar_id (Indonesian calendar), synth (simulator), features, model, trainset,
                     train, evaluate, baselines, forecast (onnxruntime), plan (scenarios + shopping list)
-backend/laris_api/  FastAPI: auth, records, stock ledger, expenses, analytics, weekly summary,
-                    forecasts and what-if, demo data
+backend/laris_api/  FastAPI: auth, records, till and special orders, stock ledger, expenses, analytics,
+                    weekly summary, CSV reports, notes, backups, forecasts and what-if, demo data
 frontend/src/       React + TypeScript + Recharts, mobile-first, Indonesian and English, light and dark
 models/larisnet/    model.onnx + meta.json + eval results (the app's model)
 notebooks/          training on Colab / Kaggle GPUs
@@ -250,13 +298,16 @@ docs/               owner guide, laptop install guide, deployment (all ID)
 - **Backend:** API tests (sign-up profile, auth, sales booking ingredients, stock counts,
   closures and regular days off, expenses and net profit, demo, forecasts, plan, weekly summary,
   monthly target, what-if, till orders and cancelling, special orders in stock, profit and the
-  shopping list, notes, backups, old databases gaining new columns, CSV export) run on both SQLite
-  and PostgreSQL. The desktop app has a `--selftest` that CI runs on the bundled Windows build.
+  shopping list, notes and their place on the board, backups, starting over, own ingredients and
+  removing them, weekly/monthly/yearly reports, old databases gaining new columns, CSV export) run
+  on both SQLite and PostgreSQL. The desktop app has a `--selftest` that CI runs on the bundled Windows build.
 - **Web:** every Indonesian text has an English entry (checked in the build), type-checked build,
   then a Playwright run against a new shop: it goes through the sign-up wizard, opens every page
   on a phone in light mode, on a desktop in dark mode and in English, records a sale, buys stock,
-  records and deletes an expense, sells and cancels at the till, finishes a special order, pins a
-  note, runs a what-if, switches theme and language, and fails on
+  records and deletes an expense, downloads the week, month and year reports, adds, renames and
+  removes an ingredient, sells and cancels at the till, finishes a special order, pins a note and
+  drags it across the cork board (its place and colour must survive a reload), runs a what-if,
+  switches theme and language, and fails on
   console errors, failed API calls, missing English texts or sideways scrolling.
 - **Docker:** the image is built and smoke-tested, checking that the model is loaded and the
   forecast comes from LarisNet.
