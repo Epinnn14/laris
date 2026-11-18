@@ -195,6 +195,26 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
   await page.getByRole("button", { name: "Tempel" }).click();
   await page.getByText("Nomor pemasok sayur 0812").waitFor({ timeout: 10000 }).catch(() => problems.push("note not pinned on the board"));
 
+  // the cork board: drag the note somewhere else, change its colour, and both stay after a reload
+  await page.goto(`${base}/#/catatan`);
+  const sticky = page.locator(".sticky", { hasText: "Nomor pemasok sayur 0812" });
+  await sticky.waitFor({ timeout: 10000 });
+  const box = await sticky.boundingBox();
+  await page.mouse.move(box.x + 100, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 260, box.y + 200, { steps: 8 });
+  await page.mouse.move(box.x + 400, box.y + 230, { steps: 8 });
+  await page.mouse.up();
+  await sticky.getByRole("button", { name: "Ganti warna" }).click();
+  await sticky.getByRole("button", { name: "Biru" }).click();
+  await page.waitForTimeout(800);
+  await page.reload();
+  await sticky.waitFor({ timeout: 10000 });
+  const after = await sticky.evaluate((el) => ({ left: parseFloat(el.style.left), top: parseFloat(el.style.top), paper: el.style.getPropertyValue("--paper") }));
+  expect(after.left >= 300 && after.top >= 150, `dragged note did not stay put (${JSON.stringify(after)})`);
+  expect(after.paper === "#a8dcff", "note colour not kept");
+  await page.screenshot({ path: `${out}/desktop-dark-catatan-geser.png`, fullPage: true });
+
   // a menu item costed the simple way: money spent and portions it makes
   await page.goto(`${base}/#/menu`);
   await page.getByRole("button", { name: "Menu baru" }).click();

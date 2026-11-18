@@ -138,6 +138,9 @@ export const Icon = {
   till: I(<><rect x="4" y="10" width="16" height="10" rx="1.5" /><path d="M7 10V5h10v5" /><path d="M9 7h6M8 14h2M14 14h2M8 17h8" /></>),
   clipboard: I(<><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M8.5 12l2 2 4-4M9 17h6" /></>),
   note: I(<><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" /><path d="M8 8h8M8 11h6" /></>),
+  pin: I(<><circle cx="12" cy="8" r="4.5" /><path d="M12 12.5V21" /></>),
+  palette: I(<><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.6 0-.9.7-1.5 1.7-1.5H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z" /><circle cx="7.5" cy="11" r="1" /><circle cx="10.5" cy="7.5" r="1" /><circle cx="15" cy="7.5" r="1" /></>),
+  trash: I(<><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /><path d="M10 11v6M14 11v6" /></>),
   download: I(<><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19h14" /></>),
   copy: I(<><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>),
 };

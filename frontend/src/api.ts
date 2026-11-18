@@ -33,6 +33,7 @@ export const api = {
   get: <T>(p: string) => call<T>("GET", p),
   post: <T>(p: string, b?: unknown) => call<T>("POST", p, b ?? {}),
   put: <T>(p: string, b?: unknown) => call<T>("PUT", p, b ?? {}),
+  patch: <T>(p: string, b?: unknown) => call<T>("PATCH", p, b ?? {}),
   del: <T>(p: string) => call<T>("DELETE", p),
 };
 
@@ -195,6 +196,9 @@ export interface PreOrder {
   note: string; total: number; rest: number; lines: PreOrderLine[];
 }
 
-export interface Note { id: number; text: string; pinned: boolean; updated: string }
+export interface Note {
+  id: number; text: string; pinned: boolean; updated: string;
+  x: number | null; y: number | null; z: number; color: string | null;
+}
 
 export interface BackupStatus { available: boolean; folders: string[]; last: string | null; count: number }

@@ -1,10 +1,9 @@
-// Dashboard pieces for the till, special orders and the notes board.
-import { useState } from "react";
+// Dashboard pieces for the till and special orders.
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api, type Note, type PreOrder, type TodayTill } from "../api";
+import { type PreOrder, type TodayTill } from "../api";
 import { t } from "../i18n";
 import { dec, num, rupiah, rupiahShort } from "../format";
-import { ErrorBox, Loading, toast, useApi } from "../ui";
+import { ErrorBox, Loading, useApi } from "../ui";
 import { whenLabel } from "./Pesanan";
 
 /** One line of live numbers from the till today; hidden for shops that do not use the till. */
@@ -86,73 +85,6 @@ export function UpcomingOrders({ today }: { today: string }) {
               </tr>
             ))}
           </tbody></table>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/** An empty board for anything: a supplier's number, an idea for a new dish, who still owes money. */
-export function NotesBoard({ bare }: { bare?: boolean } = {}) {
-  const notes = useApi<Note[]>("/notes");
-  const [draft, setDraft] = useState("");
-  const [editing, setEditing] = useState<number | null>(null);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const add = async () => {
-    if (!draft.trim()) return;
-    setBusy(true);
-    try { await api.post("/notes", { text: draft.trim() }); setDraft(""); notes.reload(); }
-    catch (e) { toast((e as Error).message); } finally { setBusy(false); }
-  };
-  const save = async (n: Note, patch: Partial<Note>) => {
-    try { await api.put(`/notes/${n.id}`, { text: patch.text ?? n.text, pinned: patch.pinned ?? n.pinned }); setEditing(null); notes.reload(); }
-    catch (e) { toast((e as Error).message); }
-  };
-  const remove = async (n: Note) => {
-    if (!confirm(t("Hapus catatan ini?"))) return;
-    await api.del(`/notes/${n.id}`);
-    notes.reload();
-  };
-
-  return (
-    <section className="card" aria-labelledby="board-h">
-      {bare ? <h2 id="board-h" className="sr">{t("Papan catatan")}</h2> : (
-        <div className="card-head">
-          <div><h2 id="board-h">{t("Papan catatan")}</h2>
-            <p className="small muted">{t("Tulis apa saja: nomor pemasok, rencana menu baru, siapa yang masih utang.")}</p></div>
-          <a className="small" href="#/catatan">{t("Buka")}</a>
-        </div>
-      )}
-      <div className="card-body stack" style={{ gap: 12 }}>
-        <div className="row top" style={{ gap: 8 }}>
-          <textarea className="input grow" rows={2} maxLength={2000} value={draft} aria-label={t("Catatan baru")}
-                    placeholder={t("Tulis catatan…")} onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) add(); }} />
-          <button className="btn" onClick={add} disabled={busy || !draft.trim()}>{t("Tempel")}</button>
-        </div>
-        {notes.error ? <ErrorBox message={notes.error} retry={notes.reload} /> : !notes.data ? <Loading /> :
-          notes.data.length === 0 ? <p className="muted">{t("Papan masih kosong.")}</p> : (
-          <div className="board">
-            {notes.data.map((n) => (
-              <div key={n.id} className={`board-note ${n.pinned ? "pinned" : ""}`}>
-                {editing === n.id ? (
-                  <textarea autoFocus value={text} maxLength={2000} aria-label={t("Ubah catatan")} onChange={(e) => setText(e.target.value)} />
-                ) : <div className="text">{n.text}</div>}
-                <div className="tools">
-                  {editing === n.id ? <>
-                    <button className="btn small ghost" onClick={() => setEditing(null)}>{t("Batal")}</button>
-                    <button className="btn small" onClick={() => text.trim() && save(n, { text: text.trim() })}>{t("Simpan")}</button>
-                  </> : <>
-                    <button className="btn small ghost" onClick={() => save(n, { pinned: !n.pinned })} aria-pressed={n.pinned}>{n.pinned ? t("Lepas") : t("Sematkan")}</button>
-                    <button className="btn small ghost" onClick={() => { setEditing(n.id); setText(n.text); }}>{t("Ubah")}</button>
-                    <button className="btn small ghost" onClick={() => remove(n)}>{t("Hapus")}</button>
-                  </>}
-                </div>
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </section>

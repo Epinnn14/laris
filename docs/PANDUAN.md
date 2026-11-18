@@ -167,7 +167,14 @@ Pesanan tidak dipakai untuk prediksi, karena bukan pola jualan harian.
 
 ## 13. Papan catatan
 
-Di Beranda ada **Papan catatan** untuk menulis apa saja: nomor pemasok, rencana menu baru, siapa yang masih utang. Catatan bisa **disematkan** supaya selalu di atas, diubah, atau dihapus.
+**Papan catatan** (menu samping, dan potongannya di Beranda) berupa sticky note di papan gabus. Tulis apa saja:
+nomor pemasok, rencana menu baru, siapa yang masih utang. Pilih warna kertasnya, lalu tekan **Tempel**.
+
+- **Geser** catatan ke mana saja dengan mouse atau jari. Letaknya tersimpan, juga di HP.
+- Ketuk catatan untuk alat kecilnya: **sematkan** (paku merah, tampil duluan di Beranda), **ubah** (atau ketuk dua
+  kali), **ganti warna**, dan **hapus**.
+- Pakai keyboard: pilih catatan dengan Tab, geser dengan tombol panah (Shift = lebih jauh), Enter untuk mengubah.
+- Di HP papannya bisa digeser ke samping kalau catatan ditempel di bagian kanan.
 
 ## 14. Memakai dari HP
 

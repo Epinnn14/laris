@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { AppState, Dashboard, Forecast, Plan, PreOrder, Target, TodayTill } from "../api";
-import { HoursCard, NotesBoard, TodayLine, UpcomingOrders } from "./BerandaExtras";
+import { HoursCard, TodayLine, UpcomingOrders } from "./BerandaExtras";
+import { NotesPreview } from "./Corkboard";
 import { t, useLang } from "../i18n";
 import { addDays, catLabel, change, dayShort, dayWithName, expenseLabel, monthName, num, pct, rupiah, rupiahShort, weekdayAbbr, weekdayShort } from "../format";
 import { ErrorBox, Loading, PageHead, Segmented, useApi } from "../ui";
@@ -57,7 +58,7 @@ export default function Beranda({ state }: { state: AppState }) {
         <TargetCard target={d.target} />
       </div>
       <div className="grid two" style={{ alignItems: "start" }}>
-        <NotesBoard />
+        <NotesPreview />
         <UpcomingOrders today={state.today} />
       </div>
     </>
@@ -76,7 +77,7 @@ export default function Beranda({ state }: { state: AppState }) {
           </div>
         </div>
         <div className="grid two" style={{ alignItems: "start" }}>
-          <NotesBoard />
+          <NotesPreview />
           <UpcomingOrders today={state.today} />
         </div>
         <DailyChart d={d} />

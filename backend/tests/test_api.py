@@ -188,11 +188,15 @@ def test_old_database_gets_new_columns(tmp_path):
     con.execute("CREATE TABLE menu_items (id INTEGER PRIMARY KEY, name VARCHAR(120), category VARCHAR(32), "
                 "price INTEGER, active BOOLEAN, sort INTEGER, created DATETIME)")
     con.execute("INSERT INTO menu_items VALUES (1, 'Es Teh', 'minuman_dingin', 5000, 1, 0, '2026-01-01')")
+    con.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, text VARCHAR(2000), pinned BOOLEAN, updated DATETIME)")
+    con.execute("INSERT INTO notes VALUES (1, 'Pak Joko 0812', 0, '2026-11-01 08:00:00')")
     con.commit()
     con.close()
     Database(f"sqlite:///{db}").create()
     cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(menu_items)")}
     assert {"batch_cost", "batch_qty"} <= cols
+    note = sqlite3.connect(db).execute("SELECT text, x, y, color, z FROM notes").fetchone()
+    assert note == ("Pak Joko 0812", None, None, None, None)  # old notes are laid out on the board automatically
 
 
 def test_summary_suggestions(owner):
@@ -364,3 +368,16 @@ def test_own_ingredients_edit_and_remove(owner):
     assert all(g["id"] != tea["id"] for g in owner.get("/api/ingredients").json())
     assert all(r["ingredient_id"] != tea["id"] for r in owner.get("/api/menu").json()[0]["recipe"])
     assert any(m["ingredient_id"] == tea["id"] for m in owner.get("/api/stock/moves").json())
+
+
+def test_notes_on_the_cork_board(owner):
+    a = owner.post("/api/notes", json={"text": "Gas habis Kamis", "color": "#ffb3c7", "x": 40, "y": 30}).json()
+    b = owner.post("/api/notes", json={"text": "Pak Joko 0812"}).json()
+    assert (a["x"], a["y"], a["color"]) == (40, 30, "#ffb3c7") and b["x"] is None and b["z"] > a["z"]
+    before = owner.get("/api/notes").json()
+    moved = owner.patch(f"/api/notes/{a['id']}", json={"x": 512.5, "y": 260, "z": b["z"] + 1}).json()
+    assert (moved["x"], moved["y"], moved["z"], moved["text"]) == (512.5, 260, b["z"] + 1, "Gas habis Kamis")
+    assert moved["updated"] == next(n for n in before if n["id"] == a["id"])["updated"]  # moving is not editing
+    assert owner.patch(f"/api/notes/{a['id']}", json={"color": "red"}).status_code == 422
+    assert owner.patch(f"/api/notes/{a['id']}", json={"pinned": True}).json()["pinned"]
+    assert owner.get("/api/notes").json()[0]["id"] == a["id"]

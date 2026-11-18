@@ -172,3 +172,9 @@ class Note(Base):
     text: Mapped[str] = mapped_column(String(2000))
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     updated: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # where the sticky note sits on the cork board (pixels from the top left; empty = laid out
+    # automatically), its paper colour, and which note lies on top
+    x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    color: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    z: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -119,9 +119,24 @@ class StatusIn(BaseModel):
     status: str = Field(pattern="^(baru|proses|selesai|batal)$")
 
 
+NOTE_COLOR = r"^#[0-9a-fA-F]{6}$"
+
+
 class NoteIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     pinned: bool = False
+    color: str | None = Field(default=None, pattern=NOTE_COLOR)
+    x: float | None = Field(default=None, ge=0, le=20000)
+    y: float | None = Field(default=None, ge=0, le=20000)
+
+
+class NoteMove(BaseModel):
+    """Changes that do not count as editing the note: moving it, its colour, pinning it."""
+    x: float | None = Field(default=None, ge=0, le=20000)
+    y: float | None = Field(default=None, ge=0, le=20000)
+    z: int | None = Field(default=None, ge=0)
+    color: str | None = Field(default=None, pattern=NOTE_COLOR)
+    pinned: bool | None = None
 
 
 class SimulateIn(BaseModel):
@@ -746,7 +761,8 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
     # ---- notes board
 
     def note_out(n: Note) -> dict:
-        return {"id": n.id, "text": n.text, "pinned": n.pinned, "updated": n.updated.isoformat(timespec="minutes")}
+        return {"id": n.id, "text": n.text, "pinned": n.pinned, "updated": n.updated.isoformat(timespec="minutes"),
+                "x": n.x, "y": n.y, "z": n.z or 0, "color": n.color}
 
     @app.get("/api/notes")
     def get_notes(s: Session = Depends(authed)):
@@ -754,7 +770,8 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
 
     @app.post("/api/notes", status_code=201)
     def add_note(body: NoteIn, s: Session = Depends(authed)):
-        n = Note(text=body.text, pinned=body.pinned, updated=store.now(s))
+        top = s.scalar(select(func.max(Note.z))) or 0
+        n = Note(text=body.text, pinned=body.pinned, updated=store.now(s), color=body.color, x=body.x, y=body.y, z=top + 1)
         s.add(n)
         s.commit()
         return note_out(n)
@@ -765,6 +782,19 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         if not n:
             raise HTTPException(404, "Catatan tidak ada")
         n.text, n.pinned, n.updated = body.text, body.pinned, store.now(s)
+        for k in ("color", "x", "y"):
+            if getattr(body, k) is not None:
+                setattr(n, k, getattr(body, k))
+        s.commit()
+        return note_out(n)
+
+    @app.patch("/api/notes/{nid}")
+    def move_note(nid: int, body: NoteMove, s: Session = Depends(authed)):
+        n = s.get(Note, nid)
+        if not n:
+            raise HTTPException(404, "Catatan tidak ada")
+        for k, v in body.model_dump(exclude_none=True).items():
+            setattr(n, k, v)
         s.commit()
         return note_out(n)
 

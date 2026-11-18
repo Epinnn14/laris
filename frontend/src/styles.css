@@ -377,22 +377,73 @@ hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; }
   }
 }
 
-/* ---------- notes board */
-.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.board-note {
-  position: relative; padding: 12px 14px 10px; border-radius: var(--r-sm); border: 1px solid var(--rule-strong);
-  background: var(--sheet); min-height: 90px;
+/* ---------- notes board: sticky notes on cork in a wooden frame (the same look as the corkboard app).
+   Cork and paper are physical things, so they keep their colours in the dark theme too, only dimmed. */
+.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.composer textarea { font: 500 22px/1.25 "Caveat", "Comic Sans MS", cursive; border-color: rgba(43, 38, 32, 0.25); }
+.composer textarea::placeholder { color: rgba(43, 38, 32, 0.5); }
+.composer > .row { flex-direction: column; align-items: stretch; }
+@media (max-width: 640px) { .composer { grid-template-columns: 1fr; } .composer > .row { flex-direction: row; justify-content: space-between; } }
+.dots { display: flex; gap: 6px; flex-wrap: wrap; }
+.dot { border-radius: 50%; border: 2px solid rgba(43, 38, 32, 0.25); padding: 0; cursor: pointer; flex: none; }
+.dot[aria-pressed="true"] { border-color: #2b2620; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85); }
+
+.cork-frame {
+  padding: 12px; border-radius: 8px;
+  background:
+    repeating-linear-gradient(90deg, rgba(120, 70, 20, 0.12) 0 2px, transparent 2px 9px, rgba(255, 230, 190, 0.1) 9px 10px, transparent 10px 17px),
+    linear-gradient(135deg, #e3b778, #c88f4d 40%, #dcae6d 70%, #b98142);
+  box-shadow: inset 0 0 0 2px rgba(255, 236, 200, 0.55), inset 0 0 0 3px rgba(90, 50, 15, 0.35), 0 10px 24px rgba(0, 0, 0, 0.18);
 }
-/* the text sits on ruled lines like a notebook page, the identity of the "buku kas" */
-.board-note .text {
-  white-space: pre-wrap; word-break: break-word; line-height: 24px;
-  background-image: repeating-linear-gradient(transparent 0 23px, var(--rule) 23px 24px);
+.cork-frame { contain: inline-size; }
+.cork-scroll { overflow: auto; border-radius: 3px; -webkit-overflow-scrolling: touch; }
+.cork {
+  position: relative; background-color: #c79559;
+  box-shadow: inset 0 0 0 1px rgba(80, 45, 10, 0.5), inset 0 3px 10px rgba(60, 30, 5, 0.45);
 }
-.board-note.pinned { border-color: var(--accent); }
-.board-note .tools { display: flex; gap: 2px; justify-content: flex-end; margin-top: 6px; line-height: 1.4; }
-.board-note textarea { width: 100%; min-height: 96px; border: 0; background: transparent; resize: vertical; line-height: 24px; padding: 0; }
-.board-note textarea:focus-visible { outline: none; }
-.board-note:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+:root[data-theme="dark"] .cork { box-shadow: inset 0 0 0 1px rgba(80, 45, 10, 0.5), inset 0 3px 10px rgba(60, 30, 5, 0.45), inset 0 0 0 9999px rgba(20, 12, 4, 0.28); }
+:root[data-theme="dark"] .cork-frame { background: linear-gradient(135deg, #a8834f, #8a6236 40%, #9e7a49 70%, #7f5a2c); }
+.cork-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: 500 34px "Caveat", cursive; color: rgba(60, 35, 10, 0.6); pointer-events: none; }
+
+.sticky {
+  position: absolute; width: 210px; min-height: 190px; display: flex; flex-direction: column;
+  color: #2b2620; text-decoration: none; touch-action: none; user-select: none; cursor: grab;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--paper) 88%, white) 0%, var(--paper) 55%, color-mix(in srgb, var(--paper) 90%, black) 100%);
+  border-bottom-right-radius: 60px 6px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.25), 0 8px 14px rgba(0, 0, 0, 0.18);
+  transform: rotate(var(--tilt)); transform-origin: 50% 0; transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+:root[data-theme="dark"] .sticky { background: linear-gradient(170deg, color-mix(in srgb, var(--paper) 82%, white) 0%, color-mix(in srgb, var(--paper) 88%, black) 55%, color-mix(in srgb, var(--paper) 78%, black) 100%); }
+.sticky.on { transform: rotate(0deg); }
+.sticky.dragging { cursor: grabbing; transition: none; transform: rotate(0deg) scale(1.03); box-shadow: 0 6px 8px rgba(0, 0, 0, 0.25), 0 22px 30px rgba(0, 0, 0, 0.3); }
+.sticky:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.sticky .ink {
+  flex: 1; padding: 28px 16px 6px; font: 500 24px/1.2 "Caveat", "Comic Sans MS", cursive;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;
+}
+.sticky textarea.ink { width: 100%; min-height: 130px; border: 0; outline: none; resize: none; background: rgba(255, 255, 255, 0.35); color: inherit; user-select: text; cursor: text; }
+.sticky .tools { display: flex; gap: 2px; justify-content: flex-end; align-items: center; padding: 4px 8px 8px; min-height: 40px; opacity: 0; transition: opacity 0.12s; }
+.sticky:hover .tools, .sticky.on .tools, .sticky:focus-within .tools { opacity: 1; }
+@media (hover: none) { .sticky .tools { opacity: 1; } }
+.sticky .tools .btn { color: #2b2620; border-color: rgba(43, 38, 32, 0.3); background: rgba(255, 255, 255, 0.45); }
+.icon-btn { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #2b2620; cursor: pointer; }
+.icon-btn:hover { background: rgba(43, 38, 32, 0.1); }
+.icon-btn[aria-pressed="true"] { color: #b3141c; }
+.sticky .pin { position: absolute; left: calc(50% - 15px); top: -10px; width: 30px; height: 30px; z-index: 2; pointer-events: none; }
+.sticky .tape {
+  position: absolute; left: calc(50% - 46px); top: -12px; width: 92px; height: 26px; transform: rotate(-4deg); pointer-events: none;
+  background: rgba(236, 222, 190, 0.82); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  clip-path: polygon(0 0, 100% 0, 97% 16%, 100% 32%, 97% 48%, 100% 64%, 97% 80%, 100% 100%, 0 100%, 3% 84%, 0 68%, 3% 52%, 0 36%, 3% 20%);
+}
+
+/* the dashboard strip: smaller stickies in a row, a tap opens the board */
+.cork.strip { display: flex; flex-wrap: wrap; gap: 22px 18px; padding: 24px 18px 20px; min-height: 150px; align-items: flex-start; border-radius: 3px; }
+.sticky.mini { position: relative; width: 150px; min-height: 118px; cursor: pointer; touch-action: auto; }
+.sticky.mini .ink { padding: 22px 12px 10px; font-size: 20px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.sticky.mini:hover { transform: rotate(0deg) translateY(-2px); }
+.cork-empty.small-empty { font-size: 26px; }
+.cork-more { align-self: center; font: 500 24px "Caveat", cursive; color: #3a2410; background: rgba(255, 248, 235, 0.85); padding: 4px 12px; border-radius: 8px; text-decoration: none; }
+@media (max-width: 640px) { .sticky.mini { width: calc(50% - 9px); } }
 
 /* ---------- special orders */
 .po { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--rule); align-items: start; }

@@ -43,7 +43,7 @@ Also in the app:
 - **Special orders (pesanan):** boxed meals and catering with customer, due date, down payment and
   status. Their ingredients are added to the shopping list before they are due; they are kept out
   of the forecast's history.
-- **Notes board** on the dashboard for anything the owner wants in sight.
+- **Notes board**: sticky notes on a cork board, dragged anywhere, in six paper colours, pinned ones first on the dashboard.
 - **Sign-up wizard** that asks for the shop's name, owner, type (warung makan, café, or kios /
   toko kelontong), open days, shopping habit, monthly target and wished margin, then starts from
   sample data, a sample menu or sample goods, or empty.

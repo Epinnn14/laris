@@ -44,7 +44,8 @@ class Database:
         self._add_missing_columns()
 
     # columns added after the first release; create_all() does not touch existing tables
-    NEW_COLUMNS = {"menu_items": {"batch_cost": "FLOAT", "batch_qty": "FLOAT"}}
+    NEW_COLUMNS = {"menu_items": {"batch_cost": "FLOAT", "batch_qty": "FLOAT"},
+                   "notes": {"x": "FLOAT", "y": "FLOAT", "color": "VARCHAR(9)", "z": "INTEGER"}}
 
     def _add_missing_columns(self) -> None:
         insp = inspect(self.engine)
