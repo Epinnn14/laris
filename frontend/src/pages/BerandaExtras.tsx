@@ -93,7 +93,7 @@ export function UpcomingOrders({ today }: { today: string }) {
 }
 
 /** An empty board for anything: a supplier's number, an idea for a new dish, who still owes money. */
-export function NotesBoard() {
+export function NotesBoard({ bare }: { bare?: boolean } = {}) {
   const notes = useApi<Note[]>("/notes");
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
@@ -118,10 +118,13 @@ export function NotesBoard() {
 
   return (
     <section className="card" aria-labelledby="board-h">
-      <div className="card-head">
-        <div><h2 id="board-h">{t("Papan catatan")}</h2>
-          <p className="small muted">{t("Tulis apa saja: nomor pemasok, rencana menu baru, siapa yang masih utang.")}</p></div>
-      </div>
+      {bare ? <h2 id="board-h" className="sr">{t("Papan catatan")}</h2> : (
+        <div className="card-head">
+          <div><h2 id="board-h">{t("Papan catatan")}</h2>
+            <p className="small muted">{t("Tulis apa saja: nomor pemasok, rencana menu baru, siapa yang masih utang.")}</p></div>
+          <a className="small" href="#/catatan">{t("Buka")}</a>
+        </div>
+      )}
       <div className="card-body stack" style={{ gap: 12 }}>
         <div className="row top" style={{ gap: 8 }}>
           <textarea className="input grow" rows={2} maxLength={2000} value={draft} aria-label={t("Catatan baru")}

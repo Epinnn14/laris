@@ -88,6 +88,7 @@ export default function Pengaturan({ state, prefs, onChange }: { state: AppState
             ? t("LarisNet aktif ({n} parameter), berjalan di komputer ini tanpa internet.", { n: num(state.model.params ?? 0) })
             : t("File model belum ada. Prediksi memakai rata-rata hari yang sama.")}</div>
         </section>
+        {!state.demo_mode && <StartOver shop={state.shop_name} onDone={onChange} />}
         {!state.demo_mode && <button className="btn" style={{ alignSelf: "flex-start" }} onClick={logout}>{t("Keluar")}</button>}
       </div>
     </>
@@ -118,6 +119,37 @@ function BackupCard() {
         </>
       ) : (
         <p className="small muted">{t("Cadangan otomatis aktif di aplikasi Laris untuk Windows. Kalau Laris dipasang lewat Docker, atur LARIS_BACKUP_DIR; kalau online, database Postgres punya cadangan sendiri.")}</p>
+      )}
+    </section>
+  );
+}
+
+/** Delete everything and go back to the sign-up, for a new owner or to start fresh. */
+function StartOver({ shop, onDone }: { shop: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try { await api.post("/reset", { confirm: typed }); window.location.hash = "#/beranda"; onDone(); }
+    catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <section className="card pad stack" aria-labelledby="so-h" style={{ borderColor: "var(--loss)" }}>
+      <h2 id="so-h">{t("Mulai dari awal")}</h2>
+      <p className="small">{t("Menghapus semua data toko ini (menu, penjualan, stok, pesanan, catatan, pengaturan) lalu kembali ke halaman buat akun.")}
+        {" "}{t("Di aplikasi Laris untuk Windows, salinan cadangan dibuat dulu sehingga bisa dipulihkan.")}</p>
+      {!open ? <button className="btn" style={{ alignSelf: "flex-start" }} onClick={() => setOpen(true)}>{t("Mulai dari awal…")}</button> : (
+        <>
+          <div className="field">
+            <label htmlFor="so">{t("Ketik nama usaha {shop} untuk memastikan", { shop: `"${shop}"` })}</label>
+            <input id="so" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+          </div>
+          <div className="row wrap">
+            <button className="btn" onClick={() => { setOpen(false); setTyped(""); }}>{t("Batal")}</button>
+            <button className="btn danger" disabled={busy || typed.trim() !== shop.trim()} onClick={go}>{busy ? t("Menghapus…") : t("Hapus semua dan mulai dari awal")}</button>
+          </div>
+        </>
       )}
     </section>
   );

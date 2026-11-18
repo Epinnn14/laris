@@ -107,6 +107,43 @@ def lan_ip() -> str | None:
         s.close()
 
 
+def app_url(port: int) -> str:
+    """*.localhost always points at this laptop in Edge and Chrome, so the address reads "laris"."""
+    return f"http://laris.localhost:{port}"
+
+
+def app_browser() -> str | None:
+    """Edge (on every Windows 10/11) or Chrome, which can show Laris as its own window."""
+    if sys.platform == "win32":
+        roots = [os.environ.get(k, "") for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        names = [r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"]
+        for name in names:
+            for root in roots:
+                path = Path(root) / name
+                if root and path.exists():
+                    return str(path)
+        return None
+    for name in ("microsoft-edge", "google-chrome", "chromium", "chromium-browser"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def open_app(port: int) -> None:
+    """Open Laris in a window of its own: no address bar, titled "Laris" with its icon.
+    Falls back to a normal browser tab when neither Edge nor Chrome is installed."""
+    browser = app_browser()
+    if browser:
+        try:
+            subprocess.Popen([browser, f"--app={app_url(port)}", "--window-size=1280,860"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+        except OSError:
+            pass
+    webbrowser.open(f"http://localhost:{port}")
+
+
 def laris_running(port: int) -> bool:
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1.5) as r:
@@ -221,7 +258,6 @@ def window(first: Server, cfg: Config, minimized: bool) -> None:
     holder = {"srv": first}
     srv_ = lambda: holder["srv"]  # noqa: E731  (the server is replaced after a restore)
     srv = first
-    local = f"http://localhost:{srv.port}"
     ip = lan_ip()
     phone = f"http://{ip}:{srv.port}" if ip else None
 
@@ -261,8 +297,8 @@ def window(first: Server, cfg: Config, minimized: bool) -> None:
     card = tk.Frame(outer, bg=SHEET, padx=16, pady=14, highlightthickness=1, highlightbackground=RULE)
     card.pack(fill="x", pady=(14, 10))
     label(card, "Di laptop ini", bold)
-    label(card, local, fg=MUTED)
-    button(card, "Buka Laris", lambda: webbrowser.open(local), primary=True).pack(anchor="w", pady=(8, 2))
+    label(card, "Laris terbuka di jendelanya sendiri. Tertutup? Tekan tombol ini.", small, MUTED, wraplength=360)
+    button(card, "Buka Laris", lambda: open_app(srv.port), primary=True).pack(anchor="w", pady=(8, 2))
 
     card2 = tk.Frame(outer, bg=SHEET, padx=16, pady=14, highlightthickness=1, highlightbackground=RULE)
     card2.pack(fill="x", pady=(0, 10))
@@ -378,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     if not a.headless:
         for p in PORTS:  # already running: just show it
             if laris_running(p):
-                webbrowser.open(f"http://localhost:{p}")
+                open_app(p)
                 return 0
     port = free_port()
     if port is None:
@@ -389,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Laris gagal menyala. Lihat laris.log.")
         return 1
     if not (a.no_browser or a.minimized or a.headless):
-        webbrowser.open(f"http://localhost:{port}")
+        open_app(port)
     if a.headless:
         print(f"Laris: http://localhost:{port}" + (f"  (HP: http://{lan_ip()}:{port})" if lan_ip() else ""), flush=True)
         try:

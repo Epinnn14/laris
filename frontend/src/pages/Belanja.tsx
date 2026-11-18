@@ -26,7 +26,6 @@ export default function Belanja({ today }: { today: string }) {
   const settings = useApi<Settings>("/settings");
   const ings = useApi<Ingredient[]>("/ingredients");
   const [buying, setBuying] = useState<PlanItem | null>(null);
-  const [showOk, setShowOk] = useState(false);
 
   const update = async (patch: Partial<{ cycle_days: number; service_level: number }>) => {
     await api.put("/settings", patch);
@@ -106,13 +105,13 @@ export default function Belanja({ today }: { today: string }) {
       {ok.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card-head">
-            <h2>{t("Stok cukup ({n})", { n: ok.length })}</h2>
-            <button className="btn small ghost" onClick={() => setShowOk(!showOk)} aria-expanded={showOk}>{showOk ? t("Sembunyikan") : t("Lihat")}</button>
+            <div><h2>{t("Stok cukup ({n})", { n: ok.length })}</h2>
+              <p className="small muted">{t("Belum perlu dibeli sampai belanja berikutnya.")}</p></div>
           </div>
-          {showOk && <div className="list">{ok.map((x) => (
+          <div className="list" style={{ marginTop: 8 }}>{ok.map((x) => (
             <div key={x.id} className="list-item"><span className="grow">{x.name}</span>
               <span className="small muted num">{t("ada {a}", { a: amount(x.on_hand, x.unit) })}{x.days_left !== null && ` · ${t("± {n} hari", { n: Math.round(x.days_left) })}`}</span></div>
-          ))}</div>}
+          ))}</div>
         </div>
       )}
 

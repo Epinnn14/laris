@@ -1,4 +1,4 @@
-; Inno Setup script: one Laris-Setup.exe that installs for the current user (no admin rights),
+; Inno Setup script: one Laris.exe installer that installs for the current user (no admin rights),
 ; adds a desktop icon, and can start Laris when Windows starts. The shop's data is kept in
 ; %LOCALAPPDATA%\Laris and backups in Documents\Laris Cadangan, so uninstalling or updating
 ; never deletes them.
@@ -19,7 +19,8 @@ DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\dist
-OutputBaseFilename=Laris-Setup-{#AppVersion}
+; just "Laris.exe": what people download is the app, a version number only confuses
+OutputBaseFilename=Laris
 SetupIconFile=laris.ico
 UninstallDisplayIcon={app}\Laris.exe
 Compression=lzma2

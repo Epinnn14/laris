@@ -24,6 +24,7 @@ const pages = {
   prediksi: ["Prediksi 4 minggu", "4-week forecast"],
   simulasi: ["Coba hitung: kalau…", "What if…"],
   kasir: ["Kasir", "Till"],
+  catatan: ["Papan catatan", "Notes board"],
   pesanan: ["Pesanan", "Special orders"],
   menu: ["Menu & resep", "Menu & recipes"],
   pengaturan: ["Pengaturan", "Settings"],
@@ -59,11 +60,16 @@ async function signUp(page) {
   await page.getByRole("button", { name: "Lanjut" }).click();
   await page.getByRole("button", { name: "Minggu", exact: true }).click();   // closed on Sundays
   await page.getByRole("button", { name: "2 hari sekali" }).click();
+  if (await page.getByRole("button", { name: "Lanjut" }).isEnabled()) problems.push("sign-up: continued without a sales target");
   await page.fill("#target", "60000000");
   await page.getByRole("button", { name: "Lanjut" }).click();
-  await page.getByRole("radio", { name: /Pilih menu dari contoh/ }).click();
-  if (await page.getByRole("button", { name: "Lanjut" }).isEnabled()) problems.push("sign-up: continued without picking a menu");
-  await page.getByRole("radio", { name: /Coba dengan data contoh/ }).click();
+  // the menu step needs at least one item, and an own item needs its price
+  if (await page.getByRole("button", { name: "Lanjut" }).isEnabled()) problems.push("sign-up: continued without any menu");
+  await page.getByLabel("Nama menu").first().fill("Es Kopi Susu Aren");
+  if (await page.getByRole("button", { name: "Lanjut" }).isEnabled()) problems.push("sign-up: continued with an item without a price");
+  await page.getByLabel("Harga jual (Rp)").first().fill("18000");
+  await page.getByText("1 menu akan dibuat.").waitFor({ timeout: 5000 }).catch(() => problems.push("sign-up: menu count not shown"));
+  await page.getByRole("radio", { name: /Coba dulu dengan data contoh/ }).click();
   await page.getByRole("button", { name: "Lanjut" }).click();
   await page.fill("#pw", password);
   await page.fill("#pw2", "different");

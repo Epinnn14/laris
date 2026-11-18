@@ -8,7 +8,7 @@
 cafés and grocery kiosks.** Runs offline on the shop laptop and opens on any phone on the same WiFi.
 *Catat penjualan, pantau stok bahan, dan tahu besok harus belanja apa.*
 
-**Download for Windows:** [Laris-Setup (latest release)](https://github.com/Epinnn14/laris/releases/latest).
+**Download for Windows:** [Laris.exe](https://github.com/Epinnn14/laris/releases/latest/download/Laris.exe) (always the latest version).
 No Docker, no terminal: install, scan the QR code with the cashier's phone, sell.
 Indonesian setup guide: [docs/PASANG.md](docs/PASANG.md).
 
@@ -194,8 +194,9 @@ risk and a plain-language reason for each item, and copies to WhatsApp in one ta
 
 ## Run it
 
-- **Shop laptop (Windows), no technical steps:** download `Laris-Setup-x.y.z.exe` from the
-  releases and install it. A small window shows the address and a QR code for phones on the same
+- **Shop laptop (Windows), no technical steps:** download [`Laris.exe`](https://github.com/Epinnn14/laris/releases/latest/download/Laris.exe)
+  and install it. Laris opens in its own window (Edge or Chrome app mode at
+  `laris.localhost`, no address bar). A small control window shows a QR code for phones on the same
   WiFi, makes a daily backup to Documents (plus an optional flash drive or Google Drive folder),
   restores a backup, and resets the password. Guide in Indonesian: [docs/PASANG.md](docs/PASANG.md).
   The installer is built and self-tested by [`windows.yaml`](.github/workflows/windows.yaml)

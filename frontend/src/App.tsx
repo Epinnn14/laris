@@ -18,6 +18,7 @@ import Simulasi from "./pages/Simulasi";
 import Lainnya from "./pages/Lainnya";
 import Kasir from "./pages/Kasir";
 import Pesanan from "./pages/Pesanan";
+import Catatan from "./pages/Catatan";
 
 type IconT = (p: { size?: number }) => ReactNode;
 export type Route = { path: string; label: string; short: string; icon: IconT; group: string; mobile: boolean; hint: string };
@@ -26,6 +27,7 @@ export const ROUTES: Route[] = [
   { path: "kasir", label: "Kasir", short: "Kasir", icon: Icon.till, group: "Setiap hari", mobile: true, hint: "Catat tiap orderan saat pembeli bayar" },
   { path: "catat", label: "Catat penjualan", short: "Catat", icon: Icon.pencil, group: "Setiap hari", mobile: true, hint: "Isi total porsi terjual per hari" },
   { path: "pesanan", label: "Pesanan", short: "Pesanan", icon: Icon.clipboard, group: "Setiap hari", mobile: false, hint: "Pesanan nasi kotak, katering, acara" },
+  { path: "catatan", label: "Papan catatan", short: "Catatan", icon: Icon.note, group: "Setiap hari", mobile: false, hint: "Nomor pemasok, rencana, utang pelanggan" },
   { path: "stok", label: "Stok bahan", short: "Stok", icon: Icon.box, group: "Setiap hari", mobile: false, hint: "Beli, hitung, dan buang bahan" },
   { path: "belanja", label: "Daftar belanja", short: "Belanja", icon: Icon.cart, group: "Setiap hari", mobile: true, hint: "Bahan yang perlu dibeli dan berapa banyak" },
   { path: "pengeluaran", label: "Pengeluaran", short: "Biaya", icon: Icon.wallet, group: "Setiap hari", mobile: false, hint: "Gas, listrik, sewa, gaji, dan biaya lain" },
@@ -113,6 +115,7 @@ export default function App() {
       case "lainnya": return <Lainnya prefs={prefs} />;
       case "kasir": return <Kasir />;
       case "pesanan": return <Pesanan today={state.today} />;
+      case "catatan": return <Catatan />;
       default: return <Beranda state={state} />;
     }
   })();

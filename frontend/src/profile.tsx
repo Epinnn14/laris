@@ -16,6 +16,9 @@ export const EMPTY_PROFILE: ProfileValue = {
 
 type Set = (p: Partial<ProfileValue>) => void;
 
+/** 10% to 90%: grocery kiosks live on thin margins, food stalls on wide ones. */
+export const MARGINS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+
 export function ShopFields({ v, set }: { v: ProfileValue; set: Set }) {
   return (
     <>
@@ -53,7 +56,7 @@ export function ShopFields({ v, set }: { v: ProfileValue; set: Set }) {
   );
 }
 
-export function HabitFields({ v, set }: { v: ProfileValue; set: Set }) {
+export function HabitFields({ v, set, requireTarget }: { v: ProfileValue; set: Set; requireTarget?: boolean }) {
   const toggle = (d: number) => set({ open_days: v.open_days.includes(d) ? v.open_days.filter((x) => x !== d) : [...v.open_days, d].sort() });
   return (
     <>
@@ -76,13 +79,14 @@ export function HabitFields({ v, set }: { v: ProfileValue; set: Set }) {
                              { value: 3, label: t("3 hari sekali") }, { value: 7, label: t("Seminggu sekali") }]} />
         <span className="hint">{t("Daftar belanja menghitung bahan sampai belanja berikutnya.")}</span>
       </div>
-      <RupiahField id="target" label={t("Target omzet per bulan")} optional value={v.target_revenue}
+      <RupiahField id="target" label={t("Target omzet per bulan")} optional={!requireTarget} value={v.target_revenue}
                    onChange={(n) => set({ target_revenue: n })}
-                   hint={t("Beranda akan menunjukkan apakah target bulan ini kemungkinan tercapai.")} />
+                   hint={requireTarget && !v.target_revenue ? t("Isi perkiraan uang masuk sebulan yang ingin dicapai, misalnya Rp30.000.000. Bisa diubah nanti.")
+                     : t("Beranda akan menunjukkan apakah target bulan ini kemungkinan tercapai.")} />
       <div className="field">
         <span className="label" id="mg-l">{t("Untung yang diinginkan dari harga jual")}</span>
         <Segmented label={t("Untung yang diinginkan dari harga jual")} value={v.target_margin} onChange={(m) => set({ target_margin: m })}
-                   options={[0.2, 0.4, 0.5, 0.6, 0.8].map((m) => ({ value: m, label: `${Math.round(m * 100)}%` }))} />
+                   options={MARGINS.map((m) => ({ value: m, label: `${Math.round(m * 100)}%` }))} />
         <span className="hint">{t("Contoh 60%: dari harga Rp10.000, modal paling banyak Rp4.000. Toko kelontong biasanya 10–20%, warung makan 50–60%. Dipakai untuk saran harga di Menu.")}</span>
       </div>
     </>

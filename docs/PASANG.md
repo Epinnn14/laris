@@ -10,12 +10,13 @@ Untuk pemilik usaha yang ingin langsung pakai: tidak perlu Docker, tidak perlu i
 
 ## Pasang
 
-1. Buka halaman **Releases** di GitHub Laris, lalu unduh **Laris-Setup-x.y.z.exe**.
+1. Unduh **Laris.exe** dari https://github.com/Epinnn14/laris/releases/latest/download/Laris.exe (selalu versi terbaru).
 2. Klik dua kali file itu. Kalau Windows menampilkan "Windows protected your PC", pilih **More info**, lalu **Run anyway**. Peringatan ini muncul karena aplikasinya belum ditandatangani.
 3. Centang dua pilihan berikut, lalu tekan **Install**:
    - **Buat ikon Laris di desktop**
    - **Nyalakan Laris otomatis setiap laptop dinyalakan**
-4. Laris terbuka di browser. Isi data usaha dan buat kata sandi.
+4. Laris terbuka di **jendelanya sendiri**, seperti aplikasi biasa: tanpa kolom alamat, judulnya "Laris". Jendela ini memakai Microsoft Edge yang sudah ada di Windows.
+5. Isi data usaha, target omzet, dan menu yang kamu jual, lalu buat kata sandi.
 
 Pemasangan tidak meminta hak admin dan tidak mengubah pengaturan Windows.
 
@@ -23,7 +24,7 @@ Pemasangan tidak meminta hak admin dan tidak mengubah pengaturan Windows.
 
 Saat Laris menyala, muncul jendela kecil **"Laris menyala"**. Isinya:
 
-- alamat untuk laptop ini,
+- tombol **Buka Laris** kalau jendela Laris tertutup,
 - **kode QR untuk HP**: buka kamera HP, arahkan ke kode itu, lalu ketuk tautannya,
 - kalau QR tidak bisa dipakai, ketik alamat yang tertulis di bawahnya, misalnya `http://192.168.1.5:8000`.
 
@@ -45,13 +46,13 @@ Biarkan jendela "Laris menyala" terbuka selama toko buka. Boleh diperkecil, tapi
 
 1. Pasang Laris di laptop baru.
 2. Di jendela Laris, tekan **Pulihkan…**, lalu pilih file cadangan terbaru (`laris-tanggal.db`) dari flashdisk atau Google Drive.
-3. Muat ulang halaman Laris di browser dan HP.
+3. Muat ulang Laris di laptop dan HP.
 
 Data yang ada sebelum dipulihkan ikut disalin dulu ke folder cadangan, dengan nama yang berawalan `laris-sebelum-pulih`, jadi pemulihan bisa dibatalkan.
 
 ## Memperbarui Laris
 
-Unduh dan jalankan Laris-Setup versi baru. Data dan cadangan tidak berubah.
+Unduh lagi **Laris.exe** dari link yang sama dan jalankan. Data dan cadangan tidak berubah.
 
 ## Seberapa banyak yang bisa ditampung
 

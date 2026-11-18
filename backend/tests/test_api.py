@@ -297,3 +297,29 @@ def test_backups(client, tmp_path):
     finally:
         backup.configure([])
     assert client.post("/api/backup").status_code == 409
+
+
+def test_setup_with_own_menu_and_sample_prices(client):
+    r = client.post("/api/setup", json={
+        "shop_name": "Warung Laba", "password": "rahasia1", "target_revenue": 20_000_000, "start": "catalog",
+        "catalog_items": ["nasgor", "esteh"], "catalog_prices": {"nasgor": 17000},
+        "own_items": [{"name": "Nasi Uduk Komplit", "category": "makanan", "price": 12000, "cost": 5000},
+                      {"name": "Es Cendol", "category": "minuman_dingin", "price": 6000}]})
+    assert r.status_code == 200
+    menu = {m["name"]: m for m in client.get("/api/menu").json()}
+    assert menu["Nasi Goreng Ayam"]["price"] == 17000 and menu["Es Teh Manis"]["price"] == 5000
+    assert menu["Nasi Uduk Komplit"]["unit_cost"] == 5000 and menu["Es Cendol"]["unit_cost"] == 0
+    assert client.get("/api/settings").json()["target_revenue"] == 20_000_000
+
+
+def test_reset_starts_over(owner):
+    owner.post("/api/catalog/apply", json={"items": ["nasgor"]})
+    owner.post("/api/notes", json={"text": "x"})
+    assert owner.post("/api/reset", json={"confirm": "salah"}).status_code == 422
+    assert owner.get("/api/menu").json()
+    assert owner.post("/api/reset", json={"confirm": "Warung Uji"}).status_code == 200
+    owner.cookies.clear()
+    st = owner.get("/api/state").json()
+    assert st["setup_needed"] and not st["authed"] and st["today"] == "2026-11-17"
+    owner.post("/api/setup", json={"shop_name": "Baru", "password": "rahasia1"})
+    assert owner.get("/api/menu").json() == [] and owner.get("/api/notes").json() == []

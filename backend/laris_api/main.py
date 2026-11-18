@@ -26,7 +26,7 @@ from . import analytics, auth, backup, demo, kios, store, summary
 from .db import Database
 from .forecasting import SENSITIVITY, Forecasts, scenario
 from .models import (DailySale, DayStatus, Expense, Ingredient, MenuItem, Note, Order, PreOrder, PreOrderLine, PromoPlan,
-                     RecipeLine, StockMove)
+                     RecipeLine, Setting, StockMove)
 
 Q10, Q50, Q90 = (F.QUANTILES.index(q) for q in (0.1, 0.5, 0.9))
 
@@ -47,6 +47,13 @@ class Profile(BaseModel):
     language: str | None = Field(default=None, pattern="^(id|en)$")
 
 
+class OwnItemIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    category: str = "makanan"
+    price: int = Field(ge=0, le=100_000_000)
+    cost: float | None = Field(default=None, ge=0, le=100_000_000)  # cost of one portion, if known
+
+
 class SetupIn(Profile):
     shop_name: str = Field(min_length=1, max_length=80)
     business: str = "warung_makan"
@@ -54,6 +61,12 @@ class SetupIn(Profile):
     start: str = Field(default="empty", pattern="^(empty|demo|catalog)$")
     demo: bool = False                 # older clients
     catalog_items: list[str] = []
+    catalog_prices: dict[str, int] = {}   # the owner's own price for a sample item
+    own_items: list[OwnItemIn] = Field(default=[], max_length=300)
+
+
+class ResetIn(BaseModel):
+    confirm: str
 
 
 class LoginIn(BaseModel):
@@ -254,8 +267,15 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         if start == "demo":
             demo.load(s, body.business)
         save_profile(s, body)
-        if start == "catalog" and body.catalog_items:
-            apply_catalog(s, body.catalog_items)
+        if start != "demo":
+            if body.catalog_items:
+                apply_catalog(s, body.catalog_items, body.catalog_prices)
+            for n, it in enumerate(body.own_items):
+                if it.category not in store.CATEGORIES:
+                    raise HTTPException(422, "Kategori tidak dikenal")
+                s.add(MenuItem(name=it.name.strip(), category=it.category, price=it.price, sort=100 + n,
+                               batch_cost=it.cost if it.cost else None, batch_qty=1 if it.cost else None))
+            store.bump(s)
         s.commit()
         login_cookie(resp, s)
         return {"ok": True}
@@ -266,6 +286,23 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         if not pw or not auth.check_password(body.password, pw):
             raise HTTPException(401, "Kata sandi salah")
         login_cookie(resp, s)
+        return {"ok": True}
+
+    @app.post("/api/reset")
+    def reset(body: ResetIn, resp: Response, s: Session = Depends(authed)):
+        """Delete everything and start again from the sign-up. A backup is made first when
+        backups are on (the laptop app), so this can be undone with Restore."""
+        if body.confirm.strip() != store.get(s, "shop_name").strip():
+            raise HTTPException(422, "Nama usaha yang diketik tidak sama")
+        backup.make(db.engine, label="sebelum-reset-" + store.now(s).strftime("%Y-%m-%d_%H%M%S"))
+        from .db import Base
+        keep = {k: store.get(s, k) for k in ("today", "timezone") if s.get(Setting, k)}
+        for table in reversed(Base.metadata.sorted_tables):
+            s.execute(table.delete())
+        for k, v in keep.items():
+            store.put(s, k, v)
+        s.commit()
+        resp.delete_cookie(auth.COOKIE)
         return {"ok": True}
 
     @app.post("/api/logout")
@@ -403,14 +440,15 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         s.commit()
         return {"added": added}
 
-    def apply_catalog(s: Session, keys: list[str]) -> int:
+    def apply_catalog(s: Session, keys: list[str], prices: dict[str, int] | None = None) -> int:
+        prices = {k: v for k, v in (prices or {}).items() if isinstance(v, int) and 0 <= v <= 100_000_000}
         all_items = {m.key: m for menu in MENUS.values() for m in menu}
         existing = {g.name: g for g in store.ingredients(s, active_only=False)}
         added = 0
         for key in keys:
             g = kios.BY_KEY.get(key)
             if g:  # a good is its own stock: one sold takes one off the shelf
-                it = MenuItem(name=g.name, category=g.category, price=g.price)
+                it = MenuItem(name=g.name, category=g.category, price=prices.get(key, g.price))
                 s.add(it)
                 ing = existing.get(g.name)
                 if not ing:
@@ -427,7 +465,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             m = all_items.get(key)
             if not m:
                 continue
-            it = MenuItem(name=m.name, category=m.category, price=m.price)
+            it = MenuItem(name=m.name, category=m.category, price=prices.get(key, m.price))
             s.add(it)
             s.flush()
             for k, amount in m.recipe.items():
