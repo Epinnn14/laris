@@ -12,6 +12,7 @@
 AppId={{6B0C5B4E-3C1F-4C3B-9E9C-6C1A7D2B5A11}
 AppName=Laris
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}
 AppPublisher=Laris
 DefaultDirName={localappdata}\Programs\Laris
 DisableDirPage=yes

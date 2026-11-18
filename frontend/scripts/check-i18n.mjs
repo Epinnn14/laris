@@ -2,8 +2,10 @@
 // Usage: node scripts/check-i18n.mjs [--list]   (--list prints every missing text)
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("../src/", import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: on Windows the pathname is "/D:/..." and breaks join()
+const root = fileURLToPath(new URL("../src/", import.meta.url));
 const files = [];
 const walk = (d) => readdirSync(d).forEach((f) => { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(f) && files.push(p); });
 walk(root);
