@@ -183,7 +183,7 @@ function Plans({ start, onChange }: { start: string; onChange: () => void }) {
           <div className="row wrap">
             <input className="input" type="date" value={pStart} min={start} onChange={(e) => setPStart(e.target.value)} style={{ width: 160 }} aria-label={t("Mulai")} />
             <span className="muted">{t("s.d.")}</span>
-            <input className="input" type="date" value={pEnd} min={pStart} onChange={(e) => setPEnd(e.target.value)} style={{ width: 160 }} aria-label={t("Selesai")} />
+            <input className="input" type="date" value={pEnd} min={pStart} onChange={(e) => setPEnd(e.target.value)} style={{ width: 160 }} aria-label={t("Tanggal selesai")} />
             <button className="btn" onClick={addPromo} disabled={!pItem}>{t("Tambah")}</button>
           </div>
           {(promos.data ?? []).map((p) => (

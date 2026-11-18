@@ -204,3 +204,96 @@ def test_summary_suggestions(owner):
     assert w["weekdays"]["busiest_revenue"] >= w["weekdays"]["quietest_revenue"] and w["weekdays"]["busiest"] != 6
     assert w["target_margin"] == 0.8 and w["low_margin"]
     assert all(x["margin"] < 0.8 and x["suggested_price"] % 500 == 0 for x in w["low_margin"])
+
+
+def test_till_orders_fill_the_day(owner):
+    owner.post("/api/catalog/apply", json={"items": ["nasgor", "esteh"]})
+    menu = {m["name"]: m for m in owner.get("/api/menu").json()}
+    ng, et = menu["Nasi Goreng Ayam"], menu["Es Teh Manis"]
+    a = owner.post("/api/orders", json={"lines": [{"item_id": ng["id"], "qty": 2}, {"item_id": et["id"], "qty": 2}],
+                                        "method": "tunai", "cash": 100000}).json()
+    b = owner.post("/api/orders", json={"lines": [{"item_id": ng["id"], "qty": 1}], "method": "qris"}).json()
+    assert (a["number"], b["number"]) == (1, 2) and a["total"] == 2 * ng["price"] + 2 * et["price"]
+    assert owner.post("/api/orders", json={"lines": [{"item_id": ng["id"], "qty": 1}], "cash": 1}).status_code == 422
+    assert owner.post("/api/orders", json={"lines": [{"item_id": 999, "qty": 1}]}).status_code == 422
+    day = owner.get("/api/sales?day=2026-11-17").json()
+    qty = {e["name"]: e["qty"] for e in day["entries"]}
+    assert qty["Nasi Goreng Ayam"] == 3 and qty["Es Teh Manis"] == 2
+    beras = {g["name"]: g["on_hand"] for g in owner.get("/api/ingredients").json()}["Beras"]
+    assert beras == -3 * 150  # used by the recipe (no purchase recorded yet)
+    t = owner.get("/api/today").json()
+    assert t["orders"] == 2 and t["revenue"] == a["total"] + b["total"] and t["top"][0]["name"] == "Nasi Goreng Ayam"
+    owner.post(f"/api/orders/{b['id']}/void")
+    owner.post(f"/api/orders/{b['id']}/void")  # twice changes nothing
+    qty = {e["name"]: e["qty"] for e in owner.get("/api/sales?day=2026-11-17").json()["entries"]}
+    assert qty["Nasi Goreng Ayam"] == 2
+    assert owner.get("/api/today").json()["orders"] == 1
+    assert [o["number"] for o in owner.get("/api/orders").json()] == [2, 1]
+
+
+def test_special_order_money_stock_and_shopping(owner):
+    owner.post("/api/catalog/apply", json={"items": ["nasgor"]})
+    ng = owner.get("/api/menu").json()[0]
+    beras = {g["name"]: g for g in owner.get("/api/ingredients").json()}["Beras"]
+    before = next((p for p in owner.get("/api/plan").json()["items"] if p["id"] == beras["id"]), {"buy": 0})["buy"]
+    body = {"customer": "Bu Ani (arisan)", "phone": "0812", "due": "2026-11-18", "due_time": "11:00", "dp": 500000,
+            "lines": [{"item_id": ng["id"], "qty": 100, "price": 15000}, {"name": "Kerupuk", "qty": 100, "price": 1000}]}
+    p = owner.post("/api/preorders", json=body).json()
+    assert p["total"] == 1_600_000 and p["rest"] == 1_100_000 and p["lines"][1]["item_id"] is None
+    after = next(x for x in owner.get("/api/plan").json()["items"] if x["id"] == beras["id"])
+    assert after["buy"] >= before + 100 * 150  # rice for 100 boxes is on the shopping list
+    assert owner.post("/api/preorders", json={**body, "due_time": "25:00"}).status_code == 422
+    # done: the money counts and the rice leaves the stock, once
+    owner.post(f"/api/preorders/{p['id']}/status", json={"status": "selesai"})
+    owner.post(f"/api/preorders/{p['id']}/status", json={"status": "selesai"})
+    assert {g["name"]: g["on_hand"] for g in owner.get("/api/ingredients").json()}["Beras"] == -100 * 150
+    assert owner.get("/api/preorders").json() == [] and len(owner.get("/api/preorders?when=done").json()) == 1
+    owner.post(f"/api/preorders/{p['id']}/status", json={"status": "proses"})
+    assert {g["name"]: g["on_hand"] for g in owner.get("/api/ingredients").json()}["Beras"] == 0
+    owner.delete(f"/api/preorders/{p['id']}")
+    assert owner.get("/api/preorders").json() == []
+
+
+def test_special_order_counts_in_profit(client):
+    from laris_api import store
+    client.post("/api/setup", json={"shop_name": "W", "password": "rahasia1"})
+    client.post("/api/catalog/apply", json={"items": ["nasgor"]})
+    ng = client.get("/api/menu").json()[0]
+    p = client.post("/api/preorders", json={"customer": "Kantor", "due": "2026-11-16", "status": "selesai",
+                                            "lines": [{"item_id": ng["id"], "qty": 10, "price": 20000}]}).json()
+    k = client.get("/api/dashboard?days=7").json()["kpi"]
+    assert k["preorder_revenue"] == 200000 and k["preorders_done"] == 1
+    assert abs(k["net_profit"] - (200000 - 10 * ng["unit_cost"])) <= 10  # unit_cost is rounded
+    assert p["status"] == "selesai"
+
+
+def test_notes_board(owner):
+    n = owner.post("/api/notes", json={"text": "Pak Joko (sayur): 0812-xxx, kirim jam 6"}).json()
+    owner.post("/api/notes", json={"text": "Coba menu baru: es kopi susu", "pinned": True})
+    notes = owner.get("/api/notes").json()
+    assert notes[0]["pinned"] and len(notes) == 2
+    owner.put(f"/api/notes/{n['id']}", json={"text": "Pak Joko: kirim jam 5"})
+    assert any(x["text"] == "Pak Joko: kirim jam 5" for x in owner.get("/api/notes").json())
+    owner.delete(f"/api/notes/{n['id']}")
+    assert len(owner.get("/api/notes").json()) == 1
+    assert owner.post("/api/notes", json={"text": ""}).status_code == 422
+
+
+def test_backups(client, tmp_path):
+    from laris_api import backup
+    assert client.post("/api/setup", json={"shop_name": "W", "password": "rahasia1"}).status_code == 200
+    if not client.app.state.db.engine.url.get_backend_name() == "sqlite":
+        return
+    backup.configure([tmp_path / "a", tmp_path / "missing-drive" / "x"])
+    try:
+        r = client.post("/api/backup").json()
+        assert len(r["made"]) == 2 and r["count"] == 1 and r["available"]
+        import sqlite3
+        con = sqlite3.connect(r["made"][0])
+        assert con.execute("select value from settings where key='shop_name'").fetchone()[0] == "W"
+        for i in range(35):
+            backup.make(client.app.state.db.engine, label=f"2026-01-{i:02d}")
+        assert len(list((tmp_path / "a").glob("laris-*.db"))) == backup.KEEP
+    finally:
+        backup.configure([])
+    assert client.post("/api/backup").status_code == 409

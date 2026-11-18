@@ -37,7 +37,19 @@ Kalau ingin stok bahan berkurang otomatis dan muncul di daftar belanja, buka **H
   - **Tahan berapa hari**. Ayam segar 2 hari, beras 180 hari.
   - **Datang setelah berapa hari**. Isi 0 kalau bisa dibeli langsung; isi 3 kalau biji kopi dipesan online.
 
-## 3. Catat penjualan setiap hari
+## 3. Kasir: catat tiap orderan
+
+Untuk toko yang ramai, buka **Kasir** di HP atau laptop:
+
+1. Ketuk menu yang dipesan. Ketuk lagi untuk menambah porsi.
+2. Pilih cara bayar: **Tunai**, **QRIS**, atau **Transfer**. Untuk tunai, isi uang yang diterima atau ketuk **Uang pas** / **Rp50 rb**, dan kembaliannya langsung terlihat.
+3. Tekan **Simpan orderan**.
+
+Setiap orderan langsung menambah penjualan hari itu dan mengurangi stok bahan. Halaman **Catat** ikut menampilkan totalnya. Orderan yang salah bisa **Dibatalkan** dari daftar "Orderan hari ini". Beberapa HP boleh dipakai bersamaan.
+
+Di Beranda muncul baris **Hari ini dari kasir** (omzet dan jumlah orderan sejauh ini) dan grafik **Jam berapa paling ramai?**.
+
+## 4. Catat penjualan setiap hari (tanpa kasir)
 
 Buka **Catat**, isi jumlah porsi tiap menu dengan tombol − dan +, lalu tekan **Simpan**.
 
@@ -47,14 +59,14 @@ Buka **Catat**, isi jumlah porsi tiap menu dengan tombol − dan +, lalu tekan *
 - Centang **"Tutup hari ini"** kalau tidak buka. Hari tutup tidak dianggap hari sepi.
 - Hari yang terlewat muncul sebagai pengingat **"Belum dicatat"** di Beranda dan di halaman Catat.
 
-## 4. Stok bahan
+## 5. Stok bahan
 
 - **Beli**: catat saat belanja. Tombol cepat "1 × karung 5 kg" mengisi jumlah dan perkiraan harga.
 - **Hitung stok**: isi jumlah yang benar-benar ada di dapur. Laris menyesuaikan catatannya. Sebaiknya lakukan seminggu sekali.
 - **Buang**: catat bahan yang basi atau rusak. Totalnya muncul di Beranda sebagai "bahan terbuang".
 - Warna stok: **merah** artinya akan habis sebelum barang baru datang, **kuning** artinya menipis, **hijau** artinya aman.
 
-## 5. Prediksi
+## 6. Prediksi
 
 Prediksi muncul setelah sekitar **7 hari** penjualan tercatat, dan makin akurat setelah 8 minggu.
 Model LarisNet membaca pola berikut:
@@ -70,7 +82,7 @@ Model LarisNet membaca pola berikut:
 
 **Rencana tutup dan promo** (bagian bawah halaman Prediksi): isi tanggal mudik, libur, atau promo. Prediksi dan daftar belanja langsung menyesuaikan.
 
-## 6. Daftar belanja
+## 7. Daftar belanja
 
 Laris menghitung berapa bahan yang terpakai sampai barang berikutnya datang, dibandingkan dengan stok yang ada.
 
@@ -82,7 +94,7 @@ Laris menghitung berapa bahan yang terpakai sampai barang berikutnya datang, dib
 - **Salin untuk WhatsApp**: daftar siap dikirim ke pemasok atau ke orang yang belanja.
 - Tekan **Sudah dibeli** setelah belanja, supaya stok bertambah.
 
-## 7. Pengeluaran dan untung bersih
+## 8. Pengeluaran dan untung bersih
 
 Buka **Pengeluaran** untuk mencatat gas, listrik dan air, sewa, gaji, kemasan, serta bensin dan ongkir. Bahan tidak perlu dicatat di sini karena sudah tercatat di Stok.
 
@@ -98,7 +110,7 @@ Beranda lalu menghitung seperti buku kas:
 
 Di bawahnya ada garis "dari setiap Rp100.000 yang masuk", supaya kelihatan berapa yang jadi bahan, biaya, dan untung.
 
-## 8. Target bulanan
+## 9. Target bulanan
 
 Kalau target omzet diisi, Beranda menunjukkan:
 
@@ -107,7 +119,7 @@ Kalau target omzet diisi, Beranda menunjukkan:
 - berapa yang perlu didapat per hari buka,
 - dan kemungkinan target tercapai (kecil, setengah-setengah, atau besar).
 
-## 9. Ringkasan minggu
+## 10. Ringkasan minggu
 
 Halaman **Ringkasan minggu** merangkum 7 hari terakhir dalam kalimat biasa:
 
@@ -120,7 +132,7 @@ Halaman **Ringkasan minggu** merangkum 7 hari terakhir dalam kalimat biasa:
 
 Tekan **Salin untuk WhatsApp** untuk mengirimnya ke keluarga atau rekan usaha.
 
-## 10. Coba hitung: kalau…
+## 11. Coba hitung: kalau…
 
 Pilih satu menu, lalu coba:
 
@@ -136,12 +148,33 @@ Tidak ada yang berubah sampai kamu sendiri mengubah harga di Menu.
 
 Di halaman **Menu & resep**, kolom **Saran harga** menunjukkan harga yang memberi untung sesuai target dari Pengaturan.
 
-## 11. Memakai dari HP
+## 12. Pesanan di luar jualan harian
 
-Kalau Laris jalan di laptop toko, HP yang tersambung ke WiFi yang sama bisa membuka `http://<alamat-IP-laptop>:8000`.
+Untuk nasi kotak, katering, atau pesanan acara, buka **Pesanan → Pesanan baru**. Isi:
+
+- nama pemesan dan nomor WhatsApp,
+- tanggal dan jam diambil atau diantar,
+- isi pesanan (pilih dari menu atau tulis sendiri; harganya boleh berbeda, misalnya harga paket),
+- uang muka (DP).
+
+Laris lalu:
+
+- menampilkan pesanan yang harus siap hari ini atau besok di **Yang perlu dilakukan** dan di kotak **Pesanan** di Beranda,
+- memasukkan bahannya ke **Daftar belanja** sebelum hari H,
+- setelah pesanan ditandai **Selesai**, mengurangi stok bahannya dan menghitung uangnya di untung bersih.
+
+Pesanan tidak dipakai untuk prediksi, karena bukan pola jualan harian.
+
+## 13. Papan catatan
+
+Di Beranda ada **Papan catatan** untuk menulis apa saja: nomor pemasok, rencana menu baru, siapa yang masih utang. Catatan bisa **disematkan** supaya selalu di atas, diubah, atau dihapus.
+
+## 14. Memakai dari HP
+
+Kalau Laris jalan di laptop toko, HP yang tersambung ke WiFi yang sama cukup memindai kode QR di jendela Laris (lihat [PASANG.md](PASANG.md)).
 Kalau Laris dipasang online (lihat [DEPLOY.md](DEPLOY.md)), cukup buka alamatnya dari mana saja dan masuk dengan kata sandi.
 
-## 12. Data Anda
+## 15. Data Anda
 
 - **Pengaturan → Unduh semua penjualan (CSV)** bisa dibuka di Excel atau Google Sheets.
 - Di laptop, data tersimpan di volume Docker `laris-data`. Online, data tersimpan di database Postgres milik Anda.

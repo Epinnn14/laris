@@ -22,10 +22,11 @@ from sqlalchemy.orm import Session
 from laris_ml import features as F
 from laris_ml.catalog import INGREDIENTS, MENUS
 
-from . import analytics, auth, demo, kios, store, summary
+from . import analytics, auth, backup, demo, kios, store, summary
 from .db import Database
 from .forecasting import SENSITIVITY, Forecasts, scenario
-from .models import DailySale, DayStatus, Expense, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
+from .models import (DailySale, DayStatus, Expense, Ingredient, MenuItem, Note, Order, PreOrder, PreOrderLine, PromoPlan,
+                     RecipeLine, StockMove)
 
 Q10, Q50, Q90 = (F.QUANTILES.index(q) for q in (0.1, 0.5, 0.9))
 
@@ -68,6 +69,45 @@ class ExpenseIn(BaseModel):
     category: str
     amount: float = Field(gt=0, le=1_000_000_000)
     note: str = Field(default="", max_length=200)
+
+
+class OrderLineIn(BaseModel):
+    item_id: int
+    qty: int = Field(gt=0, le=10000)
+
+
+class OrderIn(BaseModel):
+    lines: list[OrderLineIn] = Field(min_length=1, max_length=200)
+    method: str = Field(default="tunai", pattern="^(tunai|qris|transfer)$")
+    cash: int | None = Field(default=None, ge=0, le=1_000_000_000)
+    note: str = Field(default="", max_length=200)
+
+
+class PreOrderLineIn(BaseModel):
+    item_id: int | None = None
+    name: str = Field(default="", max_length=120)
+    qty: int = Field(gt=0, le=100000)
+    price: int = Field(ge=0, le=1_000_000_000)
+
+
+class PreOrderIn(BaseModel):
+    customer: str = Field(min_length=1, max_length=120)
+    phone: str = Field(default="", max_length=40)
+    due: date
+    due_time: str = Field(default="", pattern=r"^(|([01]\d|2[0-3]):[0-5]\d)$")
+    status: str = Field(default="baru", pattern="^(baru|proses|selesai|batal)$")
+    dp: int = Field(default=0, ge=0, le=1_000_000_000)
+    note: str = Field(default="", max_length=500)
+    lines: list[PreOrderLineIn] = Field(min_length=1, max_length=100)
+
+
+class StatusIn(BaseModel):
+    status: str = Field(pattern="^(baru|proses|selesai|batal)$")
+
+
+class NoteIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    pinned: bool = False
 
 
 class SimulateIn(BaseModel):
@@ -184,6 +224,7 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
         with db.Session() as s:
             if not s.scalar(select(MenuItem.id).limit(1)):
                 demo.load(s)
+    app.state.backup_stop = backup.start_daily(db.engine)
 
     # ---- auth and settings
 
@@ -518,6 +559,168 @@ def create_app(db_url: str | None = None, model_dir: str | None = None, demo_mod
             return scenario(forecasts, s, body.item_id, body.new_price, promo, body.sensitivity)
         except KeyError:
             raise HTTPException(404, "Menu tidak ada atau tidak aktif")
+
+    # ---- till
+
+    def order_out(o: Order, names: dict[int, str]) -> dict:
+        return {"id": o.id, "number": o.number, "day": o.day.isoformat(), "time": o.created.strftime("%H:%M"),
+                "total": o.total, "method": o.method, "cash": o.cash, "note": o.note, "void": o.void,
+                "lines": [{"item_id": ln.item_id, "name": names.get(ln.item_id, "?"), "qty": ln.qty, "price": ln.price}
+                          for ln in o.lines]}
+
+    def item_names(s: Session) -> dict[int, str]:
+        return {it.id: it.name for it in store.menu(s, active_only=False)}
+
+    @app.post("/api/orders", status_code=201)
+    def add_order(body: OrderIn, s: Session = Depends(authed)):
+        try:
+            o = store.create_order(s, [(ln.item_id, ln.qty) for ln in body.lines], body.method, body.cash, body.note)
+        except ValueError:
+            raise HTTPException(422, "Pesanan kosong atau menu tidak dijual")
+        if body.method == "tunai" and body.cash is not None and body.cash < o.total:
+            s.rollback()
+            raise HTTPException(422, "Uang yang diterima kurang dari total")
+        s.commit()
+        return order_out(o, item_names(s))
+
+    @app.get("/api/orders")
+    def get_orders(day: date | None = None, limit: int = 50, s: Session = Depends(authed)):
+        day = day or store.today(s)
+        rows = s.scalars(select(Order).where(Order.day == day).order_by(Order.id.desc()).limit(min(max(limit, 1), 500)))
+        names = item_names(s)
+        return [order_out(o, names) for o in rows]
+
+    @app.post("/api/orders/{oid}/void")
+    def void_order(oid: int, s: Session = Depends(authed)):
+        o = s.get(Order, oid)
+        if not o:
+            raise HTTPException(404, "Orderan tidak ada")
+        store.void_order(s, o)
+        s.commit()
+        return order_out(o, item_names(s))
+
+    @app.get("/api/today")
+    def get_today(s: Session = Depends(authed)):
+        out = analytics.today_till(s)
+        out["last"] = out["last"].strftime("%H:%M") if out["last"] else None
+        return out
+
+    # ---- special orders
+
+    def preorder_out(p: PreOrder) -> dict:
+        total = sum(ln.qty * ln.price for ln in p.lines)
+        return {"id": p.id, "customer": p.customer, "phone": p.phone, "due": p.due.isoformat(), "due_time": p.due_time,
+                "status": p.status, "dp": p.dp, "note": p.note, "total": total, "rest": max(0, total - p.dp),
+                "lines": [{"item_id": ln.item_id, "name": ln.name, "qty": ln.qty, "price": ln.price} for ln in p.lines]}
+
+    def save_preorder(p: PreOrder, body: PreOrderIn, s: Session) -> dict:
+        items = {it.id: it for it in store.menu(s, active_only=False)}
+        lines = []
+        for ln in body.lines:
+            it = items.get(ln.item_id) if ln.item_id else None
+            name = it.name if it else ln.name.strip()
+            if not name:
+                raise HTTPException(422, "Setiap baris pesanan perlu menu atau nama barang")
+            lines.append(PreOrderLine(item_id=it.id if it else None, name=name, qty=ln.qty, price=ln.price))
+        for k in ("customer", "phone", "due", "due_time", "status", "dp", "note"):
+            setattr(p, k, getattr(body, k))
+        p.lines.clear()
+        s.flush()
+        p.lines.extend(lines)
+        s.flush()
+        store.book_preorder(s, p)
+        s.commit()
+        s.refresh(p)
+        return preorder_out(p)
+
+    @app.get("/api/preorders")
+    def get_preorders(when: str = "open", s: Session = Depends(authed)):
+        q = select(PreOrder)
+        if when == "open":
+            q = q.where(PreOrder.status.in_(("baru", "proses"))).order_by(PreOrder.due, PreOrder.due_time)
+        else:
+            q = q.where(PreOrder.status.in_(("selesai", "batal"))).order_by(PreOrder.due.desc()).limit(100)
+        return [preorder_out(p) for p in s.scalars(q)]
+
+    @app.post("/api/preorders", status_code=201)
+    def add_preorder(body: PreOrderIn, s: Session = Depends(authed)):
+        p = PreOrder(customer=body.customer, due=body.due)
+        s.add(p)
+        s.flush()
+        return save_preorder(p, body, s)
+
+    @app.put("/api/preorders/{pid}")
+    def edit_preorder(pid: int, body: PreOrderIn, s: Session = Depends(authed)):
+        p = s.get(PreOrder, pid)
+        if not p:
+            raise HTTPException(404, "Pesanan tidak ada")
+        return save_preorder(p, body, s)
+
+    @app.post("/api/preorders/{pid}/status")
+    def preorder_status(pid: int, body: StatusIn, s: Session = Depends(authed)):
+        p = s.get(PreOrder, pid)
+        if not p:
+            raise HTTPException(404, "Pesanan tidak ada")
+        p.status = body.status
+        store.book_preorder(s, p)
+        s.commit()
+        return preorder_out(p)
+
+    @app.delete("/api/preorders/{pid}")
+    def del_preorder(pid: int, s: Session = Depends(authed)):
+        p = s.get(PreOrder, pid)
+        if p:
+            p.status = "batal"
+            store.book_preorder(s, p)
+            s.delete(p)
+            s.commit()
+        return {"ok": True}
+
+    # ---- notes board
+
+    def note_out(n: Note) -> dict:
+        return {"id": n.id, "text": n.text, "pinned": n.pinned, "updated": n.updated.isoformat(timespec="minutes")}
+
+    @app.get("/api/notes")
+    def get_notes(s: Session = Depends(authed)):
+        return [note_out(n) for n in s.scalars(select(Note).order_by(Note.pinned.desc(), Note.updated.desc()))]
+
+    @app.post("/api/notes", status_code=201)
+    def add_note(body: NoteIn, s: Session = Depends(authed)):
+        n = Note(text=body.text, pinned=body.pinned, updated=store.now(s))
+        s.add(n)
+        s.commit()
+        return note_out(n)
+
+    @app.put("/api/notes/{nid}")
+    def edit_note(nid: int, body: NoteIn, s: Session = Depends(authed)):
+        n = s.get(Note, nid)
+        if not n:
+            raise HTTPException(404, "Catatan tidak ada")
+        n.text, n.pinned, n.updated = body.text, body.pinned, store.now(s)
+        s.commit()
+        return note_out(n)
+
+    @app.delete("/api/notes/{nid}")
+    def del_note(nid: int, s: Session = Depends(authed)):
+        n = s.get(Note, nid)
+        if n:
+            s.delete(n)
+            s.commit()
+        return {"ok": True}
+
+    # ---- backups (laptop install)
+
+    @app.get("/api/backup")
+    def backup_status(_: Session = Depends(authed)):
+        return backup.status(db.engine)
+
+    @app.post("/api/backup")
+    def backup_now(_: Session = Depends(authed)):
+        made = backup.make(db.engine)
+        if not made:
+            raise HTTPException(409, "Cadangan otomatis tidak aktif di pemasangan ini")
+        return {**backup.status(db.engine), "made": [str(p) for p in made]}
 
     # ---- expenses
 

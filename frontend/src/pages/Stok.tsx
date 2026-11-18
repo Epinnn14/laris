@@ -70,7 +70,7 @@ export default function Stok({ today }: { today: string }) {
             <table>
               <thead><tr><th>{t("Tanggal")}</th><th>{t("Bahan")}</th><th>{t("Jenis")}</th><th className="num">{t("Jumlah")}</th><th className="num">{t("Biaya")}</th></tr></thead>
               <tbody>{moves.data.map((m) => (
-                <tr key={m.id}><td>{dayWithName(m.day)}</td><td>{m.ingredient}{m.note && <div className="small muted">{t(m.note)}</div>}</td>
+                <tr key={m.id}><td>{dayWithName(m.day)}</td><td>{m.ingredient}{m.note && <div className="small muted">{m.note.startsWith("pesanan #") ? `${t("pesanan")} ${m.note.slice(8)}` : t(m.note)}</div>}</td>
                   <td><span className={`badge ${m.kind === "beli" ? "good" : m.kind === "buang" ? "bad" : ""}`}>{kindLabel(m.kind)}</span></td>
                   <td className="num">{m.qty > 0 ? "+" : ""}{amount(m.qty, m.unit)}</td><td className="num">{m.cost ? rupiahShort(m.cost) : "–"}</td></tr>
               ))}</tbody>

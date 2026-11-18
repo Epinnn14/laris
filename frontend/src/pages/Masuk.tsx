@@ -50,7 +50,7 @@ function Login({ shopName, onDone }: { shopName: string; onDone: () => void }) {
         <label htmlFor="pw">{t("Kata sandi")}</label>
         <input id="pw" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                required autoComplete="current-password" autoFocus />
-        <span className="hint">{t("Lupa kata sandi? Minta orang yang memasang Laris untuk mengaturnya ulang.")}</span>
+        <span className="hint">{t("Lupa kata sandi? Di laptop toko, buka jendela Laris dan tekan \"Lupa kata sandi?\".")}</span>
       </div>
       {error && <div className="alert bad" role="alert">{error}</div>}
       <button className="btn primary" disabled={busy}>{busy ? t("Sebentar…") : t("Masuk")}</button>

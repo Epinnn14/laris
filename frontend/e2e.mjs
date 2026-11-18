@@ -23,6 +23,8 @@ const pages = {
   ringkasan: ["Ringkasan minggu", "Weekly summary"],
   prediksi: ["Prediksi 4 minggu", "4-week forecast"],
   simulasi: ["Coba hitung: kalau…", "What if…"],
+  kasir: ["Kasir", "Till"],
+  pesanan: ["Pesanan", "Special orders"],
   menu: ["Menu & resep", "Menu & recipes"],
   pengaturan: ["Pengaturan", "Settings"],
   lainnya: ["Lainnya", "More"],
@@ -134,6 +136,33 @@ const expect = (ok, msg) => { if (!ok) problems.push(msg); };
   await row.getByRole("button", { name: "Hapus" }).click();
   await page.waitForTimeout(800);
   expect(await page.getByRole("row", { name: /Rp123\.456/ }).count() === 0, "deleted expense still listed");
+
+  // the till: two portions of the first item, paid in cash, then cancelled
+  await page.goto(`${base}/#/kasir`);
+  await page.locator(".till-item").first().click();
+  await page.locator(".till-item").first().click();
+  await page.locator(".till-cart").getByRole("button", { name: "Uang pas" }).click();
+  await page.locator(".till-cart").getByRole("button", { name: "Simpan orderan" }).click();
+  await page.getByText("Orderan #", { exact: false }).first().waitFor({ timeout: 10000 }).catch(() => problems.push("till order not saved"));
+  await page.getByRole("button", { name: "Batalkan" }).first().click();
+  await page.getByText("dibatalkan", { exact: false }).first().waitFor({ timeout: 10000 }).catch(() => problems.push("till order not cancelled"));
+
+  // a special order, then done
+  await page.goto(`${base}/#/pesanan`);
+  await page.getByRole("button", { name: "Pesanan baru" }).first().click();
+  await page.fill("#pc", "Bu Uji (arisan)");
+  await page.getByRole("dialog").getByLabel("Jumlah").first().fill("50");
+  await page.getByRole("dialog").getByRole("button", { name: "Simpan" }).click();
+  await page.getByRole("article", { name: "Bu Uji (arisan)" }).waitFor({ timeout: 10000 }).catch(() => problems.push("special order not listed"));
+  await page.getByRole("article", { name: "Bu Uji (arisan)" }).getByRole("button", { name: "Selesai" }).click();
+  await page.waitForTimeout(800);
+  expect(await page.getByRole("article", { name: "Bu Uji (arisan)" }).count() === 0, "finished special order still open");
+
+  // the notes board
+  await page.goto(`${base}/#/beranda`);
+  await page.getByLabel("Catatan baru").fill("Nomor pemasok sayur 0812");
+  await page.getByRole("button", { name: "Tempel" }).click();
+  await page.getByText("Nomor pemasok sayur 0812").waitFor({ timeout: 10000 }).catch(() => problems.push("note not pinned on the board"));
 
   // a menu item costed the simple way: money spent and portions it makes
   await page.goto(`${base}/#/menu`);

@@ -81,3 +81,15 @@ def test_shopping_list_covers_lead_time_and_respects_shelf_life():
     assert out["teh"].buy == 0 and out["teh"].days_left > 20
     tot = plan.totals(paths, np.array([18000, 5000]))
     assert tot["revenue"].shape == (days, 3) and 250_000 < tot["revenue"][0, 1] < 330_000
+
+
+def test_shopping_list_adds_known_orders():
+    from laris_ml.plan import IngredientInfo, shopping_list
+    paths = np.zeros((50, 1, 28))
+    info = {"beras": IngredientInfo("beras", "Beras", "g", 0.0, 180, 0, 5000, "karung 5 kg", 14.0)}
+    base = shopping_list(paths, ["a"], {"a": {"beras": 150}}, info)
+    assert base[0].buy == 0
+    extra = np.zeros(28)
+    extra[0] = 100 * 150   # 100 boxed rice meals due today
+    got = shopping_list(paths, ["a"], {"a": {"beras": 150}}, info, extra={"beras": extra})
+    assert got[0].buy >= 15000 and got[0].packs == 3

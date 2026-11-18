@@ -94,10 +94,20 @@ def ingredient_paths(paths: np.ndarray, item_ids: list[str], recipes: dict[str, 
 
 
 def shopping_list(paths: np.ndarray, item_ids: list[str], recipes: dict[str, dict[str, float]],
-                  ingredients: dict[str, IngredientInfo], cycle_days: int = 1, service: float = 0.9
-                  ) -> list[Purchase]:
+                  ingredients: dict[str, IngredientInfo], cycle_days: int = 1, service: float = 0.9,
+                  extra: dict[str, np.ndarray] | None = None) -> list[Purchase]:
+    """extra: known use per ingredient per day on top of the forecast (for example confirmed
+    special orders), as arrays of length horizon."""
     ing_ids, use = ingredient_paths(paths, item_ids, recipes)
     horizon = use.shape[-1]
+    if extra:
+        new = [i for i in sorted(extra) if i not in ing_ids]
+        if new:
+            use = np.concatenate([use, np.zeros((use.shape[0], len(new), horizon))], axis=1)
+            ing_ids = ing_ids + new
+        use = use.copy()
+        for iid, add in extra.items():
+            use[:, ing_ids.index(iid), :] += np.asarray(add, dtype=float)[:horizon]
     out = []
     for g, iid in enumerate(ing_ids):
         info = ingredients.get(iid)

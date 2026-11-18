@@ -74,6 +74,7 @@ export interface Dashboard {
     revenue: number; revenue_change: number | null; profit: number; profit_change: number | null;
     portions: number; portions_change: number | null; avg_per_open_day: number; open_days: number; waste_cost: number;
     ingredient_cost: number; expenses: number; net_profit: number; net_change: number | null;
+    preorder_revenue: number; preorders_done: number;
     best_day: { date: string; revenue: number } | null; quiet_day: { date: string; revenue: number } | null;
   };
   expenses: { category: string; amount: number }[];
@@ -174,3 +175,25 @@ export interface Simulation {
   days: number; item: { id: number; name: string; price: number; unit_cost: number }; new_price: number;
   sensitivity: string; elasticity: number; method: string; promo_note: string | null; base: SimSide; what_if: SimSide;
 }
+
+export interface Order {
+  id: number; number: number; day: string; time: string; total: number; method: "tunai" | "qris" | "transfer";
+  cash: number | null; note: string; void: boolean; lines: { item_id: number; name: string; qty: number; price: number }[];
+}
+
+export interface TodayTill {
+  day: string; orders: number; revenue: number; avg: number; last: string | null;
+  methods: { method: string; amount: number }[]; top: { name: string; qty: number }[];
+  hours: { hour: number; orders: number }[]; history_days: number;
+}
+
+export type PreStatus = "baru" | "proses" | "selesai" | "batal";
+export interface PreOrderLine { item_id: number | null; name: string; qty: number; price: number }
+export interface PreOrder {
+  id: number; customer: string; phone: string; due: string; due_time: string; status: PreStatus; dp: number;
+  note: string; total: number; rest: number; lines: PreOrderLine[];
+}
+
+export interface Note { id: number; text: string; pinned: boolean; updated: string }
+
+export interface BackupStatus { available: boolean; folders: string[]; last: string | null; count: number }

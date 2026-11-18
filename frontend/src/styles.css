@@ -345,3 +345,56 @@ hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; }
 .steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); }
 .steps i.on { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- till: big tap targets, the cart beside on a laptop, a pay bar on a phone */
+.till { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.till-cart { position: sticky; top: 16px; }
+.till-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.till-item {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px;
+  min-height: 76px; padding: 10px 12px; text-align: left; border-radius: var(--r); border: 1px solid var(--rule-strong);
+  background: var(--sheet); font-weight: 600;
+}
+.till-item:hover { background: var(--hover); }
+.till-item:active { transform: translateY(1px); }
+.till-item[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.till-item .name { line-height: 1.25; }
+.till-item .price { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+.till-item .count {
+  position: absolute; top: -8px; right: -6px; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px;
+  background: var(--accent); color: var(--accent-ink); font-size: 13.5px; font-weight: 700; display: grid; place-items: center;
+}
+.till-bar { display: none; }
+@media (max-width: 860px) {
+  .till { grid-template-columns: 1fr; }
+  .till-cart { display: none; }
+  .till-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .till-bar {
+    display: flex; align-items: center; gap: 12px; position: sticky; bottom: 70px; z-index: 10; margin-top: 8px;
+    padding: 10px 14px; background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--r); box-shadow: var(--float);
+  }
+}
+
+/* ---------- notes board */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.board-note {
+  position: relative; padding: 12px 14px 10px; border-radius: var(--r-sm); border: 1px solid var(--rule-strong);
+  background: var(--sheet); min-height: 90px;
+}
+/* the text sits on ruled lines like a notebook page, the identity of the "buku kas" */
+.board-note .text {
+  white-space: pre-wrap; word-break: break-word; line-height: 24px;
+  background-image: repeating-linear-gradient(transparent 0 23px, var(--rule) 23px 24px);
+}
+.board-note.pinned { border-color: var(--accent); }
+.board-note .tools { display: flex; gap: 2px; justify-content: flex-end; margin-top: 6px; line-height: 1.4; }
+.board-note textarea { width: 100%; min-height: 96px; border: 0; background: transparent; resize: vertical; line-height: 24px; padding: 0; }
+.board-note textarea:focus-visible { outline: none; }
+.board-note:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- special orders */
+.po { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--rule); align-items: start; }
+.po:last-child { border-bottom: 0; }
+.po .when { font-variant-numeric: tabular-nums; }
+.po .when strong { display: block; font-family: var(--serif); font-size: 18px; }
+@media (max-width: 640px) { .po { grid-template-columns: 1fr; gap: 8px; } }

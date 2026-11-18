@@ -1,0 +1,53 @@
+name: windows app
+
+# Builds Laris-Setup.exe for shop laptops. Every push to main checks that it builds and starts;
+# a version tag (v0.2.0) also attaches the installer to a GitHub release for people to download.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - name: build the web app
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: install
+        run: pip install ./ml ./backend pyinstaller==6.22.3 segno==1.6.6
+      - name: bundle with PyInstaller
+        run: pyinstaller desktop/laris.spec --noconfirm
+      - name: self-test the bundled app (server, model, web app, demo, forecast, backups, QR)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\Laris\Laris.exe -ArgumentList "--selftest" -Wait -PassThru -NoNewWindow
+          # a windowed app has no console: its output goes to the log
+          Get-Content "$env:LOCALAPPDATA\Laris\data\laris.log" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: make the installer
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $v = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME.TrimStart("v") } else { "0.0.0-dev" }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$v" desktop\laris.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with: { name: Laris-Setup, path: dist/Laris-Setup-*.exe }
+      - name: attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with: { files: dist/Laris-Setup-*.exe }

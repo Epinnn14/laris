@@ -181,7 +181,22 @@ class Forecasts:
                                                 g.shelf_life_days, g.lead_time_days, g.pack_size, g.pack_name,
                                                 g.cost_per_unit) for g in store.ingredients(s)}
         return plan.shopping_list(res.paths, ids, recipes, infos, cycle_days=int(store.get(s, "cycle_days") or 1),
-                                  service=float(store.get(s, "service_level") or 0.9))
+                                  service=float(store.get(s, "service_level") or 0.9), extra=self.preorder_use(s, res))
+
+    def preorder_use(self, s: Session, res: Result) -> dict[str, np.ndarray]:
+        """Ingredients of open special orders, on the day they are due."""
+        from sqlalchemy import select
+        from .models import PreOrder
+        rec = store.recipe_map(store.menu(s, active_only=False))
+        out: dict[str, np.ndarray] = {}
+        end = res.start + timedelta(days=F.HORIZON - 1)
+        for p in s.scalars(select(PreOrder).where(PreOrder.status.in_(("baru", "proses")),
+                                                  PreOrder.due >= res.start, PreOrder.due <= end)):
+            k = (p.due - res.start).days
+            for ln in p.lines:
+                for ing, amount in rec.get(ln.item_id, {}).items():
+                    out.setdefault(str(ing), np.zeros(F.HORIZON))[k] += amount * ln.qty
+        return out
 
     def backtest(self, s: Session, days_ago: int = 28) -> dict | None:
         """How good was the forecast made `days_ago` days ago, against what was then sold."""

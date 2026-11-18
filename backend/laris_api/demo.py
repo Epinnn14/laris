@@ -19,14 +19,16 @@ from laris_ml import synth
 from laris_ml.catalog import INGREDIENTS
 
 from . import store
-from .models import DailySale, DayStatus, Expense, Ingredient, MenuItem, PromoPlan, RecipeLine, StockMove
+from .models import (DailySale, DayStatus, Expense, Ingredient, MenuItem, Order, OrderLine, PreOrder, PreOrderLine,
+                     PromoPlan, RecipeLine, StockMove)
 
 LOCATION = {"warung_makan": "kantor", "kafe": "kampus"}
 NAMES = {"warung_makan": "Warung Bu Sri (contoh)", "kafe": "Kopi Senja (contoh)"}
 
 
 def clear(s: Session) -> None:
-    for t in (StockMove, DailySale, DayStatus, PromoPlan, RecipeLine, MenuItem, Ingredient, Expense):
+    for t in (OrderLine, Order, PreOrderLine, PreOrder, StockMove, DailySale, DayStatus, PromoPlan, RecipeLine,
+              MenuItem, Ingredient, Expense):
         s.execute(delete(t))
 
 

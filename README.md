@@ -29,6 +29,13 @@ Laris turns the daily sales the owner already writes down into answers to three 
 
 Also in the app:
 
+- **Till (kasir):** tap items, take cash/QRIS/transfer with change worked out, save. Each order adds
+  to the day's totals, so stock, the dashboard and the forecast follow the till. Several phones
+  can sell at once; the dashboard shows today's live numbers and the busiest hours.
+- **Special orders (pesanan):** boxed meals and catering with customer, due date, down payment and
+  status. Their ingredients are added to the shopping list before they are due; they are kept out
+  of the forecast's history.
+- **Notes board** on the dashboard for anything the owner wants in sight.
 - **Sign-up wizard** that asks for the shop's name, owner, type (warung makan, café, or kios /
   toko kelontong), open days, shopping habit, monthly target and wished margin, then starts from
   sample data, a sample menu or sample goods, or empty.
@@ -174,9 +181,22 @@ risk and a plain-language reason for each item, and copies to WhatsApp in one ta
 
 ## Run it
 
+- **Shop laptop (Windows), no technical steps:** download `Laris-Setup-x.y.z.exe` from the
+  releases and install it. A small window shows the address and a QR code for phones on the same
+  WiFi, makes a daily backup to Documents (plus an optional flash drive or Google Drive folder),
+  restores a backup, and resets the password. Guide in Indonesian: [docs/PASANG.md](docs/PASANG.md).
+  The installer is built and self-tested by [`windows.yaml`](.github/workflows/windows.yaml)
+  (PyInstaller + Inno Setup); a `v*` tag attaches it to a release.
+- **Docker:**
+
 ```bash
 docker compose up -d            # http://localhost:8000, data in the laris-data volume
 ```
+
+**Capacity** (`python backend/scripts/loadtest.py`, SQLite on one machine): 102,553 till orders
+in a month made a 19 MB database; saving an order took 6 ms, four tills at once 21 ms median
+with no errors (127 orders/s), and the 30- and 90-day dashboards answered in about 12 ms, because
+they read daily totals rather than every order.
 
 - **Online for free:** [docs/DEPLOY.md](docs/DEPLOY.md) covers Render free web service plus
   Neon free Postgres, using the included `render.yaml`.
@@ -202,6 +222,7 @@ backend/laris_api/  FastAPI: auth, records, stock ledger, expenses, analytics, w
 frontend/src/       React + TypeScript + Recharts, mobile-first, Indonesian and English, light and dark
 models/larisnet/    model.onnx + meta.json + eval results (the app's model)
 notebooks/          training on Colab / Kaggle GPUs
+desktop/            Windows app: launcher window, PyInstaller spec, Inno Setup installer
 docs/               owner guide (ID), deployment (ID)
 ```
 
@@ -214,11 +235,14 @@ docs/               owner guide (ID), deployment (ID)
   posted in the job summary.
 - **Backend:** API tests (sign-up profile, auth, sales booking ingredients, stock counts,
   closures and regular days off, expenses and net profit, demo, forecasts, plan, weekly summary,
-  monthly target, what-if, CSV export) run on both SQLite and PostgreSQL.
+  monthly target, what-if, till orders and cancelling, special orders in stock, profit and the
+  shopping list, notes, backups, old databases gaining new columns, CSV export) run on both SQLite
+  and PostgreSQL. The desktop app has a `--selftest` that CI runs on the bundled Windows build.
 - **Web:** every Indonesian text has an English entry (checked in the build), type-checked build,
   then a Playwright run against a new shop: it goes through the sign-up wizard, opens every page
   on a phone in light mode, on a desktop in dark mode and in English, records a sale, buys stock,
-  records and deletes an expense, runs a what-if, switches theme and language, and fails on
+  records and deletes an expense, sells and cancels at the till, finishes a special order, pins a
+  note, runs a what-if, switches theme and language, and fails on
   console errors, failed API calls, missing English texts or sideways scrolling.
 - **Docker:** the image is built and smoke-tested, checking that the model is loaded and the
   forecast comes from LarisNet.

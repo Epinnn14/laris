@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import store
-from .models import Expense, StockMove
+from .models import Expense, Order, PreOrder, StockMove
 
 DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 
@@ -72,9 +72,25 @@ def money(s: Session, start: date, end: date, items: dict) -> dict:
     p = _period(s, start, end, items)
     w = waste_cost(s, start, end)
     ex = expenses(s, start, end)
-    gross = p["revenue"] - p["cost"]
+    pre = preorders_done(s, start, end, items)
+    gross = p["revenue"] - p["cost"] + pre["revenue"] - pre["cost"]
     return {**p, "gross": gross, "waste": w, "expenses": ex, "expense_total": sum(ex.values()),
+            "pre_revenue": pre["revenue"], "pre_cost": pre["cost"], "pre_count": pre["count"],
             "net": gross - w - sum(ex.values())}
+
+
+def preorders_done(s: Session, start: date, end: date, items: dict) -> dict:
+    """Special orders finished in the period: their money and the ingredients they used."""
+    rev = cost = 0.0
+    n = 0
+    for p in s.scalars(select(PreOrder).where(PreOrder.status == "selesai", PreOrder.due >= start,
+                                              PreOrder.due <= end)):
+        n += 1
+        for ln in p.lines:
+            rev += ln.qty * ln.price
+            if ln.item_id in items:
+                cost += ln.qty * items[ln.item_id]["cost"]
+    return {"revenue": rev, "cost": cost, "count": n}
 
 
 def item_table(s: Session) -> dict:
@@ -160,7 +176,8 @@ def dashboard(s: Session, days: int = 30) -> dict:
             "portions": cur["portions"], "portions_change": _change(cur["portions"], prev["portions"]),
             "avg_per_open_day": round(cur["revenue"] / cur["open_days"]) if cur["open_days"] else 0,
             "open_days": cur["open_days"], "waste_cost": round(cur["waste"]),
-            "ingredient_cost": round(cur["cost"]), "expenses": round(cur["expense_total"]),
+            "ingredient_cost": round(cur["cost"] + cur["pre_cost"]), "expenses": round(cur["expense_total"]),
+            "preorder_revenue": round(cur["pre_revenue"]), "preorders_done": cur["pre_count"],
             "net_profit": round(cur["net"]), "net_change": _change(cur["net"], prev["net"]) if prev["net"] > 0 else None,
             "best_day": {"date": best["date"], "revenue": best["revenue"]} if best else None,
             "quiet_day": {"date": quiet["date"], "revenue": quiet["revenue"]} if quiet else None,
@@ -168,4 +185,35 @@ def dashboard(s: Session, days: int = 30) -> dict:
         "expenses": [{"category": k, "amount": round(v)} for k, v in sorted(cur["expenses"].items(), key=lambda x: -x[1])],
         "series": series, "items": top, "weekday": weekday,
         "categories": [{"category": k, "revenue": round(v)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
+    }
+
+
+def today_till(s: Session) -> dict:
+    """Live numbers for today from the till, and which hours are usually busy."""
+    t = store.today(s)
+    orders = list(s.scalars(select(Order).where(Order.day == t, Order.void.is_(False))))
+    by_item: dict[int, int] = defaultdict(int)
+    methods: dict[str, int] = defaultdict(int)
+    for o in orders:
+        methods[o.method] += o.total
+        for ln in o.lines:
+            by_item[ln.item_id] += ln.qty
+    names = {it.id: it.name for it in store.menu(s, active_only=False)}
+    since = t - timedelta(days=28)
+    hours: dict[int, int] = defaultdict(int)
+    days = set()
+    for created, day in s.execute(select(Order.created, Order.day).where(Order.day >= since, Order.day < t,
+                                                                          Order.void.is_(False))):
+        hours[created.hour] += 1
+        days.add(day)
+    nd = max(len(days), 1)
+    revenue = sum(o.total for o in orders)
+    return {
+        "day": t.isoformat(), "orders": len(orders), "revenue": revenue,
+        "avg": round(revenue / len(orders)) if orders else 0,
+        "last": max((o.created for o in orders), default=None),
+        "methods": [{"method": k, "amount": v} for k, v in sorted(methods.items(), key=lambda x: -x[1])],
+        "top": [{"name": names.get(i, "?"), "qty": q} for i, q in sorted(by_item.items(), key=lambda x: -x[1])[:5]],
+        "hours": [{"hour": h, "orders": round(hours[h] / nd, 1)} for h in range(24)] if days else [],
+        "history_days": len(days),
     }

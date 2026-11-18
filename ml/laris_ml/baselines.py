@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from .features import CONTEXT, HORIZON
@@ -27,7 +29,9 @@ def seasonal_naive(b: dict[str, np.ndarray], qs: tuple[float, ...]) -> np.ndarra
     diff = np.where(obs[:, 7:] & obs[:, :-7], y[:, 7:] - y[:, :-7], np.nan)
     out = np.empty(point.shape + (len(qs),), np.float32)
     for j, q in enumerate(qs):
-        r = np.nan_to_num(np.nanquantile(diff, q, axis=1), nan=0.0)
+        with np.errstate(all="ignore"), warnings.catch_warnings():  # rows with no history are expected
+            warnings.simplefilter("ignore", RuntimeWarning)
+            r = np.nan_to_num(np.nanquantile(diff, q, axis=1), nan=0.0)
         out[..., j] = np.maximum(point + r[:, None], 0)
     out[b["future"][..., 0] > 0] = 0
     return out
@@ -44,7 +48,9 @@ def weekday_average(b: dict[str, np.ndarray], qs: tuple[float, ...], weeks: int 
         sel = (pd_ == d)
         sel[: span.start] = False
         vals = np.where(ok[:, sel], y[:, sel], np.nan)
-        qd = np.nan_to_num(np.nanquantile(vals, qs, axis=1).T, nan=0.0)  # (N, Q)
+        with warnings.catch_warnings():  # weekdays with no open day yet are expected
+            warnings.simplefilter("ignore", RuntimeWarning)
+            qd = np.nan_to_num(np.nanquantile(vals, qs, axis=1).T, nan=0.0)  # (N, Q)
         have = ok[:, sel].sum(1) >= 2
         qd = np.where(have[:, None], qd, overall)
         out[:, fd == d, :] = qd[:, None, :]

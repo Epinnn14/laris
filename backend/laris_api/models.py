@@ -108,3 +108,67 @@ class Expense(Base):
     category: Mapped[str] = mapped_column(String(32))  # gas, listrik_air, sewa, gaji, kemasan, transport, lainnya
     amount: Mapped[float] = mapped_column(Float)
     note: Mapped[str] = mapped_column(String(200), default="")
+
+
+class Order(Base):
+    """One sale at the till. Saving it adds its portions to the day's totals (DailySale), so
+    the dashboard, stock and forecasts work the same whether the owner uses the till or
+    types the day's totals in the evening."""
+    __tablename__ = "orders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    number: Mapped[int] = mapped_column(Integer)           # 1, 2, 3 ... within the day
+    created: Mapped[datetime] = mapped_column(DateTime)    # local shop time
+    total: Mapped[int] = mapped_column(Integer)
+    method: Mapped[str] = mapped_column(String(16), default="tunai")  # tunai, qris, transfer
+    cash: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    void: Mapped[bool] = mapped_column(Boolean, default=False)
+    lines: Mapped[list["OrderLine"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+
+
+class OrderLine(Base):
+    __tablename__ = "order_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("menu_items.id", ondelete="CASCADE"))
+    qty: Mapped[int] = mapped_column(Integer)
+    price: Mapped[int] = mapped_column(Integer)  # price at the time of sale
+    order: Mapped[Order] = relationship(back_populates="lines")
+
+
+class PreOrder(Base):
+    """A special order outside the daily trade: a catering box order, a birthday, an office
+    lunch. It is kept out of the forecast's history (it is not a normal day), its ingredients
+    are added to the shopping list before it is due, and its money counts once it is done."""
+    __tablename__ = "preorders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer: Mapped[str] = mapped_column(String(120))
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    due: Mapped[date] = mapped_column(Date, index=True)
+    due_time: Mapped[str] = mapped_column(String(5), default="")   # "HH:MM"
+    status: Mapped[str] = mapped_column(String(16), default="baru")  # baru, proses, selesai, batal
+    dp: Mapped[int] = mapped_column(Integer, default=0)              # down payment received
+    note: Mapped[str] = mapped_column(String(500), default="")
+    created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    lines: Mapped[list["PreOrderLine"]] = relationship(back_populates="preorder", cascade="all, delete-orphan")
+
+
+class PreOrderLine(Base):
+    __tablename__ = "preorder_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    preorder_id: Mapped[int] = mapped_column(ForeignKey("preorders.id", ondelete="CASCADE"), index=True)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("menu_items.id", ondelete="SET NULL"), nullable=True)
+    name: Mapped[str] = mapped_column(String(120))
+    qty: Mapped[int] = mapped_column(Integer)
+    price: Mapped[int] = mapped_column(Integer)
+    preorder: Mapped[PreOrder] = relationship(back_populates="lines")
+
+
+class Note(Base):
+    """A note on the dashboard board: anything the owner wants to keep in sight."""
+    __tablename__ = "notes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    text: Mapped[str] = mapped_column(String(2000))
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

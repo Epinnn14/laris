@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type AppState, type Business, type Settings } from "../api";
+import { api, type AppState, type BackupStatus, type Business, type Settings } from "../api";
 import { t, useLang } from "../i18n";
 import { num } from "../format";
 import { type Prefs } from "../prefs";
@@ -81,6 +81,7 @@ export default function Pengaturan({ state, prefs, onChange }: { state: AppState
             </>
           )}
         </section>
+        <BackupCard />
         <section className="card pad stack" aria-labelledby="m-h">
           <h2 id="m-h">{t("Model prediksi")}</h2>
           <div className="small">{state.model.available
@@ -90,5 +91,34 @@ export default function Pengaturan({ state, prefs, onChange }: { state: AppState
         {!state.demo_mode && <button className="btn" style={{ alignSelf: "flex-start" }} onClick={logout}>{t("Keluar")}</button>}
       </div>
     </>
+  );
+}
+
+function BackupCard() {
+  const b = useApi<BackupStatus>("/backup");
+  const [busy, setBusy] = useState(false);
+  const now = async () => {
+    setBusy(true);
+    try { b.setData(await api.post<BackupStatus>("/backup")); toast(t("Cadangan dibuat")); }
+    catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <section className="card pad stack" aria-labelledby="bk-h">
+      <h2 id="bk-h">{t("Cadangan data")}</h2>
+      {b.error ? <ErrorBox message={b.error} retry={b.reload} /> : !b.data ? <Loading /> : b.data.available ? (
+        <>
+          <p className="small">{t("Laris menyalin seluruh data sekali sehari secara otomatis dan menyimpan 30 salinan terakhir.")}</p>
+          <table className="ledger" style={{ fontSize: 15 }}><tbody>
+            <tr><td>{t("Cadangan terakhir")}</td><td>{b.data.last ? b.data.last.replace("T", " ") : t("belum ada")}</td></tr>
+            <tr><td>{t("Jumlah salinan")}</td><td>{b.data.count}</td></tr>
+            {b.data.folders.map((f, i) => <tr key={f}><td>{i === 0 ? t("Disimpan di") : t("Juga disalin ke")}</td><td className="small" style={{ wordBreak: "break-all", whiteSpace: "normal" }}>{f}</td></tr>)}
+          </tbody></table>
+          <button className="btn" style={{ alignSelf: "flex-start" }} onClick={now} disabled={busy}>{busy ? t("Menyalin…") : t("Cadangkan sekarang")}</button>
+          <span className="hint">{t("Folder kedua (flashdisk atau Google Drive) bisa dipilih di jendela aplikasi Laris di laptop.")}</span>
+        </>
+      ) : (
+        <p className="small muted">{t("Cadangan otomatis aktif di aplikasi Laris untuk Windows. Kalau Laris dipasang lewat Docker, atur LARIS_BACKUP_DIR; kalau online, database Postgres punya cadangan sendiri.")}</p>
+      )}
+    </section>
   );
 }

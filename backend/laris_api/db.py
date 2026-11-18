@@ -22,7 +22,8 @@ def make_engine(url: str | None = None):
         url = "postgresql+psycopg://" + url[len("postgresql://"):]
     if url.startswith("sqlite:///") and not url.startswith("sqlite:///:memory:"):
         Path(url[len("sqlite:///"):]).parent.mkdir(parents=True, exist_ok=True)
-    kw = {"connect_args": {"check_same_thread": False}} if url.startswith("sqlite") else {"pool_pre_ping": True}
+    # several phones at the till write at once: wait for the lock instead of failing
+    kw = {"connect_args": {"check_same_thread": False, "timeout": 30}} if url.startswith("sqlite") else {"pool_pre_ping": True}
     engine = create_engine(url, **kw)
     if url.startswith("sqlite"):
         @event.listens_for(engine, "connect")

@@ -2,7 +2,8 @@
 // So the money statement and the to-do list come first; charts follow, each titled with its question.
 import { useState } from "react";
 import { Area, Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { AppState, Dashboard, Forecast, Plan, Target } from "../api";
+import type { AppState, Dashboard, Forecast, Plan, PreOrder, Target, TodayTill } from "../api";
+import { HoursCard, NotesBoard, TodayLine, UpcomingOrders } from "./BerandaExtras";
 import { t, useLang } from "../i18n";
 import { addDays, catLabel, change, dayShort, dayWithName, expenseLabel, monthName, num, pct, rupiah, rupiahShort, weekdayAbbr, weekdayShort } from "../format";
 import { ErrorBox, Loading, PageHead, Segmented, useApi } from "../ui";
@@ -24,6 +25,8 @@ export default function Beranda({ state }: { state: AppState }) {
   const dash = useApi<Dashboard>(`/dashboard?days=${days}`, [days]);
   const fc = useApi<Forecast>("/forecast");
   const plan = useApi<Plan>("/plan");
+  const till = useApi<TodayTill>("/today");
+  const pre = useApi<PreOrder[]>("/preorders?when=open");
 
   const head = (
     <PageHead title={`${greeting()}, ${state.owner_name || state.shop_name}`}
@@ -40,7 +43,8 @@ export default function Beranda({ state }: { state: AppState }) {
   if (d.kpi.portions === 0) return (
     <>
       {head}
-      <div className="grid two">
+      <TodayLine till={till.data} />
+      <div className="grid two" style={{ marginBottom: 16, alignItems: "start" }}>
         <div className="card pad">
           <h2>{t("Belum ada penjualan tercatat di periode ini")}</h2>
           <p className="muted" style={{ marginTop: 8 }}>{t("Buku kas terisi dari catatan harian. Mulai dengan dua langkah ini:")}</p>
@@ -52,25 +56,35 @@ export default function Beranda({ state }: { state: AppState }) {
         </div>
         <TargetCard target={d.target} />
       </div>
+      <div className="grid two" style={{ alignItems: "start" }}>
+        <NotesBoard />
+        <UpcomingOrders today={state.today} />
+      </div>
     </>
   );
 
   return (
     <>
       {head}
+      <TodayLine till={till.data} />
       <div className="stack" style={{ gap: 16 }}>
         <div className="grid two" style={{ alignItems: "start" }}>
           <MoneyStatement d={d} days={days} />
           <div className="stack" style={{ gap: 16 }}>
-            <ToDo d={d} plan={plan.data} today={state.today} />
+            <ToDo d={d} plan={plan.data} today={state.today} pre={pre.data} />
             <TargetCard target={d.target} />
           </div>
+        </div>
+        <div className="grid two" style={{ alignItems: "start" }}>
+          <NotesBoard />
+          <UpcomingOrders today={state.today} />
         </div>
         <DailyChart d={d} />
         <div className="grid two" style={{ alignItems: "start" }}>
           <MenuEarnings d={d} />
           <div className="stack" style={{ gap: 16 }}>
             <Weekdays d={d} />
+            <HoursCard till={till.data} />
             <NextWeek fc={fc.data} error={fc.error} />
           </div>
         </div>
@@ -85,7 +99,8 @@ function MoneyStatement({ d, days }: { d: Dashboard; days: number }) {
   const k = d.kpi;
   const net = k.net_profit;
   const loss = net < 0;
-  const per100 = (v: number) => (k.revenue > 0 ? (v / k.revenue) * 100_000 : 0);
+  const inflow = k.revenue + k.preorder_revenue;
+  const per100 = (v: number) => (inflow > 0 ? (v / inflow) * 100_000 : 0);
   const parts = [
     { key: "bahan", label: t("Bahan"), value: k.ingredient_cost, color: "var(--chart-ink)" },
     { key: "buang", label: t("Terbuang"), value: k.waste_cost, color: "var(--warn)" },
@@ -106,6 +121,8 @@ function MoneyStatement({ d, days }: { d: Dashboard; days: number }) {
           <tbody>
             <tr><td className="sign" /><td>{t("Uang masuk dari penjualan")}<span className="note">{t("{n} porsi", { n: num(k.portions) })}</span></td>
               <td>{rupiah(k.revenue)}</td></tr>
+            {k.preorder_revenue > 0 && <tr><td className="sign">+</td><td>{t("Uang dari pesanan")}<span className="note">{t("{n} pesanan selesai", { n: k.preorders_done })} · <a href="#/pesanan">{t("lihat")}</a></span></td>
+              <td>{rupiah(k.preorder_revenue)}</td></tr>}
             <tr><td className="sign">−</td><td>{t("Modal bahan untuk porsi yang terjual")}<span className="note">{t("dari resep tiap menu")}</span></td>
               <td>{rupiah(k.ingredient_cost)}</td></tr>
             <tr><td className="sign">−</td><td>{t("Bahan terbuang")}<span className="note">{k.waste_cost > 0 ? t("basi atau rusak, dicatat di Stok") : t("tidak ada yang dicatat")}</span></td>
@@ -123,11 +140,11 @@ function MoneyStatement({ d, days }: { d: Dashboard; days: number }) {
             </tr>
           </tbody>
         </table>
-        {k.revenue > 0 && (
+        {inflow > 0 && (
           <div style={{ marginTop: 18 }}>
             <div className="small" style={{ marginBottom: 6 }}>{t("Dari setiap {rp} yang masuk:", { rp: rupiah(100_000) })}</div>
             <div className="split" role="img" aria-label={parts.map((p) => `${p.label} ${rupiah(per100(p.value))}`).join(", ")}>
-              {parts.filter((p) => p.value > 0).map((p) => <i key={p.key} style={{ width: `${(p.value / k.revenue) * 100}%`, background: p.color }} />)}
+              {parts.filter((p) => p.value > 0).map((p) => <i key={p.key} style={{ width: `${(p.value / inflow) * 100}%`, background: p.color }} />)}
             </div>
             <div className="keys">
               {parts.map((p) => (
@@ -143,8 +160,11 @@ function MoneyStatement({ d, days }: { d: Dashboard; days: number }) {
 
 // ---------------------------------------------------------------- what to do today
 
-function ToDo({ d, plan, today }: { d: Dashboard; plan: Plan | null; today: string }) {
+function ToDo({ d, plan, today, pre }: { d: Dashboard; plan: Plan | null; today: string; pre: PreOrder[] | null }) {
   const items: { urgent: boolean; text: string; href: string; action: string }[] = [];
+  const soonPre = (pre ?? []).filter((p) => p.due <= addDays(today, 1));
+  if (soonPre.length) items.push({ urgent: true, href: "#/pesanan", action: t("Lihat"),
+    text: t("{n} pesanan harus siap hari ini atau besok: {names}", { n: soonPre.length, names: soonPre.slice(0, 2).map((p) => p.customer).join(", ") + (soonPre.length > 2 ? ", …" : "") }) });
   const missing = d.series.filter((x) => !x.recorded && !x.closed && x.date >= addDays(today, -7));
   if (missing.length) {
     const last = missing[missing.length - 1].date;

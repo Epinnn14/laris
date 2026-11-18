@@ -89,7 +89,7 @@ export default function Simulasi({ today }: { today: string }) {
               <div className="row wrap" style={{ paddingLeft: 28 }}>
                 <input className="input" type="date" value={pStart} min={today} onChange={(e) => setPStart(e.target.value)} style={{ width: 170 }} aria-label={t("Mulai")} />
                 <span className="muted">{t("s.d.")}</span>
-                <input className="input" type="date" value={pEnd} min={pStart} onChange={(e) => setPEnd(e.target.value)} style={{ width: 170 }} aria-label={t("Selesai")} />
+                <input className="input" type="date" value={pEnd} min={pStart} onChange={(e) => setPEnd(e.target.value)} style={{ width: 170 }} aria-label={t("Tanggal selesai")} />
                 <span className="hint" style={{ flexBasis: "100%" }}>{t("Efek promo dihitung oleh model dari pola promo yang pernah terjadi.")}</span>
               </div>
             )}
